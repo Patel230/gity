@@ -128,6 +128,40 @@ so true real-time is impossible for a frontend. Gity instead implements
 - Last session's data is cached in the browser, so revisits paint instantly and
   then quietly revalidate live from GitHub in the background.
 
+## Agent API (read-only)
+
+Gity also includes an optional protected MCP-style JSON-RPC endpoint at
+`/api/agent`. It is designed for an agent runner to inspect GitHub without
+receiving a user's browser token. It currently exposes bounded read-only tools
+for the viewer, repositories, pull requests, issue search, Actions runs, and
+recent activity.
+
+The endpoint requires a bearer token (`GITY_AGENT_TOKEN`) and authenticates to
+GitHub with a GitHub App installation token generated from
+`GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, and `GITHUB_INSTALLATION_ID`. GitHub
+App installation tokens are short-lived; Gity requests one for each tool call
+and never returns it to the agent.
+
+Configure these values as encrypted Cloudflare Pages variables/secrets. Keep
+the agent token private and set `GITY_AGENT_ORIGIN` only when a browser-based
+agent client needs cross-origin access. Write operations are intentionally not
+available yet; they will be added only with explicit approval and audit-log
+support.
+
+Example tool call:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "list_repositories",
+    "arguments": { "per_page": 30 }
+  }
+}
+```
+
 We deliberately call this “Live Refresh”, never “real-time”, in the UI.
 
 ## GitHub API rate limits
