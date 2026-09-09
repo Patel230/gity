@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useAuth, useViewerUser } from "@/lib/auth";
 import { allIssuesOptions, eventsOptions, mergedPrsOptions, openPrsOptions, reposOptions } from "@/lib/github/queries";
 import type { ActivityItem, ActivityKind } from "@/lib/github/types";
@@ -8,6 +8,7 @@ import { useLiveQuery } from "../use-github";
 
 /** Unified activity feed: events + PR/issue open/merge/close, filterable by range. */
 export function useActivity(rangeDays: 1 | 7 | 30) {
+  const [now] = useState(() => Date.now());
   const { token, fingerprint: fp } = useAuth();
   const viewer = useViewerUser();
   const login = viewer.data?.login;
@@ -18,7 +19,7 @@ export function useActivity(rangeDays: 1 | 7 | 30) {
   const issuesQ = useLiveQuery({ ...allIssuesOptions(token, fp, login, "head") });
 
   const items: ActivityItem[] = useMemo(() => {
-    const cutoff = Date.now() - rangeDays * 86_400_000;
+    const cutoff = now - rangeDays * 86_400_000;
     const out: ActivityItem[] = [...(eventsQ.data ?? [])];
     for (const p of [...(openPrsQ.data ?? []), ...(mergedPrsQ.data ?? [])]) {
       const kind: ActivityKind =
@@ -77,7 +78,7 @@ export function useActivity(rangeDays: 1 | 7 | 30) {
       .filter((e) => new Date(e.createdAt).getTime() >= cutoff)
       .filter((e) => (seen.has(e.id) ? false : (seen.add(e.id), true)))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }, [eventsQ.data, openPrsQ.data, mergedPrsQ.data, issuesQ.data, rangeDays]);
+  }, [eventsQ.data, openPrsQ.data, mergedPrsQ.data, issuesQ.data, rangeDays, now]);
 
   return {
     items,

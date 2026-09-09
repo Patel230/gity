@@ -107,6 +107,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const stored = readStoredToken();
+    // Intentional browser-storage hydration after SSR.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTokenState(stored.token);
     setKind(stored.kind);
     setOauth(stored.oauth);

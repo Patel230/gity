@@ -40,12 +40,6 @@ interface RestUser {
   html_url: string;
 }
 
-interface RestSearchResponse<T> {
-  total_count: number;
-  incomplete_results: boolean;
-  items: T[];
-}
-
 interface RestSearchItem {
   id: number;
   number: number;

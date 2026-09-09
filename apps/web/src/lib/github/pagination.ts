@@ -38,7 +38,7 @@ export function connectionNodes<T>(conn: GraphqlConnection<T>): T[] {
 }
 
 /** Sequentially fetch all pages of a GraphQL connection field. */
-export async function fetchAllConnectionPages<TNode, TArgs>(
+export async function fetchAllConnectionPages<TNode>(
   fetchPage: (after: string | null) => Promise<GraphqlConnection<TNode>>,
   opts?: { maxPages?: number; onPage?: (nodes: TNode[]) => void },
 ): Promise<TNode[]> {

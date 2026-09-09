@@ -26,6 +26,7 @@ export function RefreshControl({ lastUpdatedAt }: { lastUpdatedAt?: number }) {
 
   // Track the most recent time all fetches settled.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (fetching === 0) setLast(Date.now());
   }, [fetching]);
 

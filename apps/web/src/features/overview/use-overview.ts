@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useAuth, useViewerUser } from "@/lib/auth";
 import {
   ciStatesOptions,
@@ -21,6 +21,7 @@ import { useLiveQuery } from "../use-github";
  * by shared query keys) and derives the headline stats + chart series.
  */
 export function useOverview() {
+  const [now] = useState(() => Date.now());
   const { token, fingerprint: fp } = useAuth();
   const viewer = useViewerUser();
   const login = viewer.data?.login;
@@ -47,7 +48,7 @@ export function useOverview() {
     const events = eventsQ.data ?? [];
 
     const today = toYMD(new Date());
-    const weekAgo = toYMD(new Date(Date.now() - 7 * 86_400_000));
+    const weekAgo = toYMD(new Date(now - 7 * 86_400_000));
 
     const mergedToday = mergedPrs.filter(
       (p) => p.mergedAt && toYMD(new Date(p.mergedAt)) === today,
@@ -132,7 +133,7 @@ export function useOverview() {
       issuesClosedByDay,
       withCi,
     };
-  }, [reposQ.data, orgsQ.data, openPrsQ.data, mergedPrsQ.data, issuesQ.data, runsQ.data, eventsQ.data, ciQ.data]);
+  }, [reposQ.data, orgsQ.data, openPrsQ.data, mergedPrsQ.data, issuesQ.data, runsQ.data, eventsQ.data, ciQ.data, now]);
 
   const isLoading =
     reposQ.isLoading || orgsQ.isLoading || openPrsQ.isLoading || issuesQ.isLoading;

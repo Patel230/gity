@@ -137,6 +137,8 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const storedTheme = read("gity.theme", "catppuccin-macchiato");
+    // Intentional browser-storage hydration after SSR.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setThemeState(storedTheme in THEMES ? storedTheme as Theme : "catppuccin-macchiato");
     const storedAppearance = read("gity.appearance", "dark") as Appearance;
     setAppearanceState(storedAppearance === "light" ? "light" : "dark");

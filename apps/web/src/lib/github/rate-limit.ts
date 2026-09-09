@@ -20,11 +20,6 @@ let snapshot: RateLimitSnapshot = {
 
 const listeners = new Set<() => void>();
 
-function emit() {
-  snapshot = { ...snapshot, updatedAt: Date.now() };
-  listeners.forEach((l) => l());
-}
-
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   return () => {

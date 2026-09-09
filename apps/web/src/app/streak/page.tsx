@@ -52,7 +52,7 @@ export default function StreakPage() {
       <Card accent={11}>
         <CardHeader>
           <CardTitle>Contributions by day</CardTitle>
-          <CardDescription>Last 52 weeks · from GitHub's contribution calendar overlaid with today's live events</CardDescription>
+          <CardDescription>Last 52 weeks · from GitHub&apos;s contribution calendar overlaid with today&apos;s live events</CardDescription>
         </CardHeader>
         <CardContent>
           {s.days.length === 0 ? (

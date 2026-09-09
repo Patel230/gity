@@ -123,7 +123,6 @@ export async function restFetchAll<T>(
   const all: T[] = [];
   let url: string | null = null;
   const firstQuery = { ...(opts?.query ?? {}), per_page: perPage };
-  let first = true;
   for (let page = 0; page < maxPages; page++) {
     let data: T[];
     let headers: Headers;

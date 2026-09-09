@@ -61,7 +61,9 @@ export async function startLogin(): Promise<void> {
     code_challenge: challenge,
     code_challenge_method: "S256",
   });
-  window.location.assign(`${AUTHORIZE_URL}?${params.toString()}`);
+  // This is an external OAuth navigation, so a full-page redirect is required.
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+  window.location.href = `${AUTHORIZE_URL}?${params.toString()}`;
 }
 
 export interface OAuthTokens {

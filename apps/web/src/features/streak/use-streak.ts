@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useAuth, useViewerUser } from "@/lib/auth";
 import {
   allIssuesOptions,
@@ -20,6 +20,7 @@ import { useLiveQuery } from "../use-github";
  * today's live events (the calendar API lags by up to ~24h).
  */
 export function useStreak() {
+  const [now] = useState(() => Date.now());
   const { token, fingerprint: fp } = useAuth();
   const viewer = useViewerUser();
   const login = viewer.data?.login;
@@ -55,14 +56,14 @@ export function useStreak() {
       bump(i.closedAt);
     }
 
-    const today = toYMD(new Date());
+    const today = toYMD(new Date(now));
     const days: { date: string; count: number }[] = [...active.entries()]
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => a.date.localeCompare(b.date));
     const activeSet = new Set(days.map((d) => d.date));
 
     // Current streak: count back from today (today may still be inactive).
-    let cursor = new Date();
+    const cursor = new Date(now);
     if (!activeSet.has(toYMD(cursor))) cursor.setDate(cursor.getDate() - 1);
     let current = 0;
     while (activeSet.has(toYMD(cursor))) {
@@ -87,7 +88,7 @@ export function useStreak() {
     }
 
     const inLast = (n: number) => {
-      const cutoff = toYMD(new Date(Date.now() - (n - 1) * 86_400_000));
+      const cutoff = toYMD(new Date(now - (n - 1) * 86_400_000));
       return days.filter((d) => d.date >= cutoff);
     };
     const last30 = inLast(30);
@@ -104,7 +105,7 @@ export function useStreak() {
       todayActive: activeSet.has(today),
       todayCount: active.get(today) ?? 0,
     };
-  }, [contribQ.data, eventsQ.data, openPrsQ.data, mergedPrsQ.data, issuesQ.data]);
+  }, [contribQ.data, eventsQ.data, openPrsQ.data, mergedPrsQ.data, issuesQ.data, now]);
 
   return {
     streak,

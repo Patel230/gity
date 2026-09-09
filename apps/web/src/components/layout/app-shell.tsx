@@ -20,7 +20,7 @@ import { GithubStarLink } from "@/components/common/github-star";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { token, setToken, clearToken } = useAuth();
+  const { token, setToken } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (pathname?.startsWith("/auth/callback")) {

@@ -33,7 +33,7 @@ export function SettingsPage({ embedded = false, section }: { embedded?: boolean
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
-  const test = async (t: string) => {
+  const test = async () => {
     setTesting(true);
     setTestResult(null);
     try {
@@ -55,7 +55,7 @@ export function SettingsPage({ embedded = false, section }: { embedded?: boolean
         <ShieldAlert className="mt-0.5 size-4 shrink-0 text-[var(--warning)]" />
         <span>
           <strong className="text-foreground">Your token is stored only in this browser</strong> and is sent
-          to GitHub directly, or through Gity's short-lived relay when your browser blocks direct access.
+          to GitHub directly, or through Gity&apos;s short-lived relay when your browser blocks direct access.
           Use Gity on a trusted device, never share this browser profile, and prefer a fine-grained token
           with the minimum read permissions. For team or public deployments, use a server-side
           authentication flow.
@@ -106,7 +106,7 @@ export function SettingsPage({ embedded = false, section }: { embedded?: boolean
             <Button size="sm" disabled={!draft} onClick={() => { setToken(draft, mode); setDraft(""); setTestResult(null); }}>
               {token ? "Replace token" : "Save token"}
             </Button>
-            <Button size="sm" variant="secondary" disabled={!token && !draft || testing} onClick={() => test(draft)}>
+            <Button size="sm" variant="secondary" disabled={!token && !draft || testing} onClick={test}>
               {testing ? <Loader className="size-3.5 animate-spin" /> : null} Test {draft ? "new token" : "current token"}
             </Button>
             {token && (
