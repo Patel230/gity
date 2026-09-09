@@ -13,9 +13,9 @@
 # testing
 /coverage
 
-# next.js
-/.next/
-/out/
+# next.js (any workspace)
+**/.next/
+**/out/
 
 # production
 /build

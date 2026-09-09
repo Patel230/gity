@@ -113,15 +113,19 @@ secret: anyone or any script with access to this browser profile can read the to
 
 ## Live Refresh (auto-update)
 
-There are no webhooks and no backend, and GitHub offers no push/streaming API for this —
-so true real-time is impossible for a Pages-hosted frontend. Gity instead implements
-**automatic near-live polling**:
+There are no webhooks, and GitHub offers no push/streaming API for this —
+so true real-time is impossible for a frontend. Gity instead implements
+**automatic polling in two tiers**:
 
-- Important overview data refetches every **30s by default** while the tab is active.
-- Polling backs off to ≥5 min while the tab is hidden, and refetches immediately on window focus/reconnect.
+- **Live tier** (workflow runs, recent activity): polls on your interval while the
+  tab is active. These are cheap REST calls with the highest signal value.
+- **Calm tier** (repos, PRs, issues, CI, contributions): refreshes on page open,
+  window focus/reconnect, and manual Refresh — never on the interval. A 30s poll
+  on the repos query alone would burn the 5,000/hr GraphQL budget in minutes.
 - A manual **Refresh** button invalidates all queries; header shows `Updated Xs ago`.
-- Configurable in Settings: **Off / 15s / 30s / 60s / 5 min**. 15s is the closest to
-  “real-time” the GitHub API allows without burning rate limits.
+- Interval configurable in Settings: **Off / 15s / 30s / 60s / 5 min**.
+- Last session's data is cached in the browser, so revisits paint instantly and
+  then quietly revalidate live from GitHub in the background.
 
 We deliberately call this “Live Refresh”, never “real-time”, in the UI.
 

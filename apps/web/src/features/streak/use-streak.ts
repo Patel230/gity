@@ -27,9 +27,9 @@ export function useStreak() {
   const contribQ = useLiveQuery({ ...contributionsOptions(token, fp, login) });
   const reposQ = useLiveQuery({ ...reposOptions(token, fp) });
   const eventsQ = useLiveQuery({ ...eventsOptions(token, fp, login) });
-  const openPrsQ = useLiveQuery({ ...openPrsOptions(token, fp, login, reposQ.data) });
-  const mergedPrsQ = useLiveQuery({ ...mergedPrsOptions(token, fp, login) });
-  const issuesQ = useLiveQuery({ ...allIssuesOptions(token, fp, login) });
+  const openPrsQ = useLiveQuery({ ...openPrsOptions(token, fp, login, reposQ.data, "head") });
+  const mergedPrsQ = useLiveQuery({ ...mergedPrsOptions(token, fp, login, "head") });
+  const issuesQ = useLiveQuery({ ...allIssuesOptions(token, fp, login, "head") });
 
   const streak = useMemo(() => {
     const active = new Map<string, number>();

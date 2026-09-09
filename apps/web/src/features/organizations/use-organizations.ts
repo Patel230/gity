@@ -12,8 +12,8 @@ export function useOrganizations() {
   const viewer = useViewerUser();
   const orgsQ = useLiveQuery({ ...orgsOptions(token, fp) });
   const reposQ = useLiveQuery({ ...reposOptions(token, fp) });
-  const prsQ = useLiveQuery({ ...openPrsOptions(token, fp, viewer.data?.login, reposQ.data) });
-  const issuesQ = useLiveQuery({ ...allIssuesOptions(token, fp, viewer.data?.login) });
+  const prsQ = useLiveQuery({ ...openPrsOptions(token, fp, viewer.data?.login, reposQ.data, "head") });
+  const issuesQ = useLiveQuery({ ...allIssuesOptions(token, fp, viewer.data?.login, "head") });
 
   const orgs: (GithubOrg & { repos: typeof reposQ.data })[] = useMemo(() => {
     const repos = reposQ.data ?? [];

@@ -13,9 +13,9 @@ export function useActivity(rangeDays: 1 | 7 | 30) {
   const login = viewer.data?.login;
   const reposQ = useLiveQuery({ ...reposOptions(token, fp) });
   const eventsQ = useLiveQuery({ ...eventsOptions(token, fp, login) });
-  const openPrsQ = useLiveQuery({ ...openPrsOptions(token, fp, login, reposQ.data) });
-  const mergedPrsQ = useLiveQuery({ ...mergedPrsOptions(token, fp, login) });
-  const issuesQ = useLiveQuery({ ...allIssuesOptions(token, fp, login) });
+  const openPrsQ = useLiveQuery({ ...openPrsOptions(token, fp, login, reposQ.data, "head") });
+  const mergedPrsQ = useLiveQuery({ ...mergedPrsOptions(token, fp, login, "head") });
+  const issuesQ = useLiveQuery({ ...allIssuesOptions(token, fp, login, "head") });
 
   const items: ActivityItem[] = useMemo(() => {
     const cutoff = Date.now() - rangeDays * 86_400_000;

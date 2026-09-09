@@ -56,20 +56,47 @@ export const qk = {
   ciStates: (fp: string) => ["gity", fp, "ci-states"] as const,
   // PR/issue/event keys include the login + repo signature so the first fetch
   // happens only when dependencies arrive (no stale empty cache), and refires
-  // exactly once when they do.
-  openPrs: (fp: string, login = "", sig = "") => ["gity", fp, "prs", "open", login, sig] as const,
-  mergedPrs: (fp: string, login = "") => ["gity", fp, "prs", "merged", login] as const,
-  allIssues: (fp: string, login = "", sig = "") => ["gity", fp, "issues", "all", login, sig] as const,
+  // exactly once when they do. `depth` separates the fast head query used for
+  // dashboard pulses from the full query used for complete listings.
+  openPrs: (fp: string, login = "", sig = "", depth: SearchDepth = "full") =>
+    ["gity", fp, "prs", "open", login, sig, depth] as const,
+  mergedPrs: (fp: string, login = "", depth: SearchDepth = "full") =>
+    ["gity", fp, "prs", "merged", login, depth] as const,
+  allIssues: (fp: string, login = "", depth: SearchDepth = "full") =>
+    ["gity", fp, "issues", "all", login, depth] as const,
   workflowRuns: (fp: string) => ["gity", fp, "actions", "runs"] as const,
   events: (fp: string, login: string) => ["gity", fp, "events", login] as const,
   contributions: (fp: string, login: string) =>
     ["gity", fp, "contributions", login] as const,
 };
 
+/**
+ * Search depth: "head" fetches page 1 only (100 most recent — fast, enough
+ * for dashboard stats and feeds); "full" paginates to exhaustion (complete
+ * listings on dedicated pages; GitHub caps search at ~1,000 results).
+ */
+export type SearchDepth = "head" | "full";
+
+function depthPages(depth: SearchDepth): number {
+  return depth === "head" ? 1 : 10;
+}
+
+/**
+ * Refresh tiers.
+ * - LIVE (workflow runs, events): follow the user's Live Refresh poll — cheap
+ *   REST calls with high signal value, so they stay on the 15s–5m interval.
+ * - CALM (everything else): refresh on mount, window-focus, and manual
+ *   Refresh only — never on the interval. A 30s poll on the repos query alone
+ *   (~600 GraphQL points) would burn the 5,000/hr budget in minutes and stall
+ *   the whole app on 429s. Spread CALM into a builder's options to opt out.
+ */
+const CALM = { refetchInterval: false as const };
+
 /* ------------------------------- options ---------------------------------- */
 
 export function viewerOptions(token: string | null, fp: string) {
   return queryOptions<GithubUser, GithubApiError>({
+    ...CALM,
     queryKey: qk.viewer(fp),
     queryFn: () => fetchViewer(token!),
     enabled: !!token,
@@ -82,6 +109,7 @@ export function viewerOptions(token: string | null, fp: string) {
 
 export function orgsOptions(token: string | null, fp: string) {
   return queryOptions<GithubOrg[], GithubApiError>({
+    ...CALM,
     queryKey: qk.orgs(fp),
     queryFn: () => fetchOrgs(token!),
     enabled: !!token,
@@ -94,6 +122,7 @@ export function orgsOptions(token: string | null, fp: string) {
 
 export function reposOptions(token: string | null, fp: string) {
   return queryOptions<GithubRepo[], GithubApiError>({
+    ...CALM,
     queryKey: qk.repos(fp),
     queryFn: () => fetchAllRepos(token!),
     enabled: !!token,
@@ -119,6 +148,7 @@ export function ciStatesOptions(
     .slice(0, 12);
   const ids = targets.map((r) => r.fullName).join(",");
   return queryOptions<Record<string, GithubRepo["ciState"]>, GithubApiError>({
+    ...CALM,
     queryKey: [...qk.ciStates(fp), ids],
     queryFn: async () => {
       const out: Record<string, GithubRepo["ciState"]> = {};
@@ -147,14 +177,19 @@ export function openPrsOptions(
   fp: string,
   login: string | undefined,
   repos: GithubRepo[] | undefined,
+  depth: SearchDepth = "full",
 ) {
-  const top = (repos ?? [])
-    .filter((r) => r.openPrCount > 0 && !r.isArchived)
-    .sort((a, b) => b.openPrCount - a.openPrCount)
-    .slice(0, 12);
+  const top =
+    depth === "full"
+      ? (repos ?? [])
+          .filter((r) => r.openPrCount > 0 && !r.isArchived)
+          .sort((a, b) => b.openPrCount - a.openPrCount)
+          .slice(0, 12)
+      : [];
   const sig = top.map((r) => r.fullName).join(",");
   return queryOptions<GithubPullRequest[], GithubApiError>({
-    queryKey: qk.openPrs(fp, login ?? "", sig),
+    ...CALM,
+    queryKey: qk.openPrs(fp, login ?? "", sig, depth),
     queryFn: async () => {
       const byKey = new Map<string, GithubPullRequest>();
       // 1) Everything involving the viewer (authored/assigned/mentioned).
@@ -163,7 +198,7 @@ export function openPrsOptions(
           const { prs } = await fetchSearchPrsAndIssues(
             token!,
             `is:pr involves:${login} sort:updated-desc`,
-            { maxPages: 3 },
+            { maxPages: depthPages(depth) },
           );
           for (const pr of prs.filter(
             (p) => p.state === "open" || p.state === "draft",
@@ -186,7 +221,7 @@ export function openPrsOptions(
       await Promise.all(workers);
       // 3) REST fallback if both came up empty but repos report open PRs.
       if (byKey.size === 0 && login) {
-        const prs = await searchPrsRest(token!, `involves:${login}`, { maxPages: 3 });
+        const prs = await searchPrsRest(token!, `involves:${login}`, { maxPages: depthPages(depth) });
         for (const pr of prs.filter(
           (p) => p.state === "open" || p.state === "draft",
         ))
@@ -209,20 +244,22 @@ export function mergedPrsOptions(
   token: string | null,
   fp: string,
   login: string | undefined,
+  depth: SearchDepth = "full",
 ) {
   return queryOptions<GithubPullRequest[], GithubApiError>({
-    queryKey: qk.mergedPrs(fp, login ?? ""),
+    ...CALM,
+    queryKey: qk.mergedPrs(fp, login ?? "", depth),
     queryFn: async () => {
       if (!login) return [];
       try {
         const { prs } = await fetchSearchPrsAndIssues(
           token!,
           `is:pr involves:${login} sort:updated-desc`,
-          { maxPages: 3 },
+          { maxPages: depthPages(depth) },
         );
         return prs.filter((p) => p.state === "merged" || p.state === "closed");
       } catch {
-        const prs = await searchPrsRest(token!, `involves:${login}`, { maxPages: 3 });
+        const prs = await searchPrsRest(token!, `involves:${login}`, { maxPages: depthPages(depth) });
         return prs.filter((p) => p.state === "merged" || p.state === "closed");
       }
     },
@@ -239,20 +276,22 @@ export function allIssuesOptions(
   token: string | null,
   fp: string,
   login: string | undefined,
+  depth: SearchDepth = "full",
 ) {
   return queryOptions<GithubIssue[], GithubApiError>({
-    queryKey: qk.allIssues(fp, login ?? ""),
+    ...CALM,
+    queryKey: qk.allIssues(fp, login ?? "", depth),
     queryFn: async () => {
       if (!login) return [];
       try {
         const { issues } = await fetchSearchPrsAndIssues(
           token!,
           `is:issue involves:${login} sort:updated-desc`,
-          { maxPages: 3 },
+          { maxPages: depthPages(depth) },
         );
         return issues;
       } catch {
-        return searchIssuesRest(token!, `involves:${login}`, { maxPages: 3 });
+        return searchIssuesRest(token!, `involves:${login}`, { maxPages: depthPages(depth) });
       }
     },
     enabled: !!token && !!login,
@@ -324,6 +363,7 @@ export function contributionsOptions(
   login: string | undefined,
 ) {
   return queryOptions<ContributionDay[], GithubApiError>({
+    ...CALM,
     queryKey: qk.contributions(fp, login ?? "unknown"),
     queryFn: async () => {
       const now = new Date();

@@ -118,7 +118,7 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Live Refresh</CardTitle>
-          <CardDescription>Polling — not true real-time. No webhooks, no backend. Pauses aggressively when the tab is hidden and refetches on focus.</CardDescription>
+          <CardDescription>Polling — not true real-time. Workflow runs and recent activity poll on this interval; heavier data (repos, PRs, issues, CI) refreshes on page open, window focus, and manual Refresh to protect GitHub rate limits.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2">

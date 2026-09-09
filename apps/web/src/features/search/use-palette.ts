@@ -24,11 +24,11 @@ export function usePaletteData(): PaletteData {
   // No polling here — pages own Live Refresh; the palette reads shared cache.
   const reposQ = useQuery({ ...reposOptions(token, fp), refetchInterval: false });
   const prsQ = useQuery({
-    ...openPrsOptions(token, fp, login, reposQ.data),
+    ...openPrsOptions(token, fp, login, reposQ.data, "head"),
     refetchInterval: false,
   });
   const issuesQ = useQuery({
-    ...allIssuesOptions(token, fp, login),
+    ...allIssuesOptions(token, fp, login, "head"),
     refetchInterval: false,
   });
   const orgsQ = useQuery({ ...orgsOptions(token, fp), refetchInterval: false });

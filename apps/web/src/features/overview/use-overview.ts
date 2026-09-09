@@ -27,9 +27,9 @@ export function useOverview() {
 
   const reposQ = useLiveQuery({ ...reposOptions(token, fp) });
   const orgsQ = useLiveQuery({ ...orgsOptions(token, fp) });
-  const openPrsQ = useLiveQuery({ ...openPrsOptions(token, fp, login, reposQ.data) });
-  const mergedPrsQ = useLiveQuery({ ...mergedPrsOptions(token, fp, login) });
-  const issuesQ = useLiveQuery({ ...allIssuesOptions(token, fp, login) });
+  const openPrsQ = useLiveQuery({ ...openPrsOptions(token, fp, login, reposQ.data, "head") });
+  const mergedPrsQ = useLiveQuery({ ...mergedPrsOptions(token, fp, login, "head") });
+  const issuesQ = useLiveQuery({ ...allIssuesOptions(token, fp, login, "head") });
   const runsQ = useLiveQuery({ ...workflowRunsOptions(token, fp, reposQ.data) });
   const eventsQ = useLiveQuery({ ...eventsOptions(token, fp, login) });
   const ciQ = useLiveQuery({ ...ciStatesOptions(token, fp, reposQ.data) });
