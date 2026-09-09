@@ -14,8 +14,7 @@ export function loginAvailable(): boolean {
 }
 
 export function callbackUrl(): string {
-  const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-  return `${window.location.origin}${base}/auth/callback/`;
+  return `${window.location.origin}/auth/callback/`;
 }
 
 function b64url(buf: ArrayBuffer): string {
