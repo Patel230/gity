@@ -46,33 +46,20 @@ That's it — no server configuration, no env secrets.
 
 ## Login options
 
-**1. Sign in with GitHub (recommended).** One-click Device Flow, works for public and private
-repos. Requires the deployer to register a GitHub App once (see below) — otherwise the app
-falls back to PAT sign-in.
+**Personal access token (the supported sign-in).** A fine-grained PAT pasted in the
+browser, stored in localStorage or sessionStorage. Full data access, including private
+repos. See “Creating a fine-grained GitHub PAT” below for the minimum permissions.
 
-**2. Personal access token.** Fine-grained PAT pasted in the browser, stored in localStorage
-or sessionStorage. Identical data access, including private repos.
+### Why no “Sign in with GitHub” button?
 
-### Enabling "Sign in with GitHub" (deployer setup, one time)
-
-A static site has no backend, so the normal OAuth web flow (which needs a `client_secret`)
-is impossible. Gity instead uses the **Device Authorization Flow with a GitHub App**, which
-needs only the public Client ID — safe to embed in the frontend:
-
-1. GitHub → Settings → Developer settings → **GitHub Apps** → New GitHub App.
-2. Name it (e.g. `Gity`), disable Webhook, no callback URL needed.
-3. Under **Permissions**, grant read-only: Contents, Pull requests, Issues, Actions,
-   Checks (or Commit statuses), Members (Organization).
-4. In the app settings, enable **Device flow** (token expiry is fine — Gity auto-refreshes
-   with the refresh token while the tab is open).
-5. Copy the **Client ID** (`Iv1.…`) and set it as `NEXT_PUBLIC_GITHUB_CLIENT_ID`:
-   - Local: `.env.local`.
-   - GitHub Pages: repo Settings → Secrets and variables → Actions → **Variables**
-     (it's public, not a secret).
-
-Users then click “Sign in with GitHub”, enter the shown code at `github.com/login/device`,
-and get a `ghu_` token scoped to the app's permissions — private repos included. Revoking
-the app authorization signs the user out.
+We tried — and GitHub's platform says no. A static site has no backend, so the normal
+OAuth web flow (needs a `client_secret`) is impossible, and the Device Flow fallback
+(which needs only a public Client ID) is also unusable from a browser: we verified that
+`github.com/login/device/code` sends **no CORS headers**, so every browser `fetch` to it
+fails, while `api.github.com` explicitly allows browser origins (`access-control-allow-origin: *`).
+GitHub only intends those login endpoints for servers/CLIs. One-click login would require
+a small token-exchange backend, which Gity deliberately doesn't have — the PAT path gives
+identical access with zero infrastructure.
 
 ## Hosting on GitHub Pages
 

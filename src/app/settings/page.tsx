@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Eye, EyeOff, KeyRound, Loader, RefreshCw, ShieldAlert, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, KeyRound, Loader, ShieldAlert, Trash2, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DeviceLogin } from "@/components/common/device-login";
 import { RateLimitPanel } from "@/components/common/rate-limit";
 import { PageHead } from "@/app/page";
 import { useAuth, useViewerUser, type StorageMode } from "@/lib/auth";
@@ -15,7 +14,7 @@ import { checkToken } from "@/lib/github/rest";
 import { POLL_LABEL, usePrefs, type PollInterval, type Theme } from "@/lib/preferences";
 
 export default function SettingsPage() {
-  const { token, kind, oauth, storageMode, setToken, clearToken, refreshOAuth } = useAuth();
+  const { token, storageMode, setToken, clearToken } = useAuth();
   const viewer = useViewerUser();
   const { theme, setTheme, poll, setPoll } = usePrefs();
   const [draft, setDraft] = useState("");
@@ -55,28 +54,16 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            Sign in with GitHub
-            {kind === "oauth" && <Badge variant="success">active</Badge>}
+            Why is there no “Sign in with GitHub” button?
           </CardTitle>
           <CardDescription>
-            One-click login via Device Flow — works for public and private repos, no token
-            pasting. {oauth?.expiresAt ? <>Session expires {new Date(oauth.expiresAt).toLocaleString()}.</> : null}
+            GitHub&apos;s login endpoints send no CORS headers, so no pure-browser app can
+            complete OAuth or Device Flow — only api.github.com accepts browser requests.
+            A personal access token gives identical access (public + private repos) and is
+            the supported sign-in for this static site. One-click login would require a
+            small token-exchange backend, which Gity deliberately doesn&apos;t have.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2">
-          {kind === "oauth" ? (
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="secondary" onClick={() => refreshOAuth()}>
-                <RefreshCw className="size-3.5" /> Refresh session now
-              </Button>
-              <Button size="sm" variant="ghost" onClick={clearToken}>
-                Sign out
-              </Button>
-            </div>
-          ) : (
-            <DeviceLogin compact />
-          )}
-        </CardContent>
       </Card>
 
       <Card>
