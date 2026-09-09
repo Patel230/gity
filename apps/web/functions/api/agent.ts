@@ -230,15 +230,26 @@ async function callTool(name: string, params: Record<string, unknown>, token: st
   throw new Error("Unknown tool.");
 }
 
-function authorized(request: Request, env: Env): boolean {
+async function authorized(request: Request, env: Env): Promise<boolean> {
   const expected = env.GITY_AGENT_TOKEN;
   const received = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
-  return Boolean(expected && received && received === expected);
+  if (!expected || !received) return false;
+  const [expectedDigest, receivedDigest] = await Promise.all([
+    crypto.subtle.digest("SHA-256", new TextEncoder().encode(expected)),
+    crypto.subtle.digest("SHA-256", new TextEncoder().encode(received)),
+  ]);
+  const left = new Uint8Array(expectedDigest);
+  const right = new Uint8Array(receivedDigest);
+  let different = left.length ^ right.length;
+  for (let i = 0; i < Math.max(left.length, right.length); i++) {
+    different |= (left[i] ?? 0) ^ (right[i] ?? 0);
+  }
+  return different === 0;
 }
 
 export async function onRequest({ request, env }: { request: Request; env: Env }): Promise<Response> {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: headers(env.GITY_AGENT_ORIGIN) });
-  if (!authorized(request, env)) return json({ error: "unauthorized" }, 401, env);
+  if (!(await authorized(request, env))) return json({ error: "unauthorized" }, 401, env);
   if (request.method === "GET") return json({ name: "gity", version: "1", tools: TOOLS }, 200, env);
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, env);
 
