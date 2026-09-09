@@ -1,26 +1,28 @@
 # Gity — Personal GitHub Command Center
 
-[![Deploy to GitHub Pages](https://github.com/Patel230/gity/actions/workflows/deploy.yml/badge.svg)](https://github.com/Patel230/gity/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Gity is a **frontend-only, open-source (MIT)** personal GitHub dashboard. There is no backend, no database,
-no Redis, no webhook service, and no MCP server. **GitHub itself is the source of truth**:
-the browser fetches data directly from the GitHub REST and GraphQL APIs. It deploys as a
-static site to **GitHub Pages** — sign in with your GitHub account and it works across your
-public and private repositories.
+Gity is an **open-source (MIT)** personal GitHub dashboard on the edge: a static
+Next.js frontend on **Cloudflare Pages** plus three tiny **Pages Functions** that exist
+only to complete GitHub login. **GitHub itself is the source of truth**: the browser
+fetches data directly from the GitHub REST and GraphQL APIs. No database, no Redis,
+no webhooks, no MCP server. Connect with GitHub and it works across your public and
+private repositories.
 
 ## Architecture
 
 ```
-Browser / Gity
+Browser / Gity (Cloudflare Pages, static)
    ├── GitHub GraphQL API  (nested repo / PR / issue / contribution data)
-   └── GitHub REST API     (search, Actions, events, token check)
-            │
-            ▼
-          GitHub
+   ├── GitHub REST API     (search, Actions, events, token check)
+   └── Pages Functions ─┐  (login only: /api/config, /api/exchange, /api/refresh)
+                        │   holds client_secret server-side, stores nothing
+                        ▼
+                      GitHub
 ```
 
-- No API proxy: `src/app/api` does not exist by design. The token is only ever sent to `api.github.com`.
+- Data calls go browser → `api.github.com` directly. The token is only ever sent to GitHub.
+- Login codes are swapped for tokens in `functions/api/*` (same origin — no CORS involved).
 - UI components never make raw GitHub calls. All data flows through:
   - `src/lib/github/` — transport (`client.ts`), GraphQL docs (`graphql.ts`), typed REST
     helpers (`rest.ts`), TanStack Query keys/options (`queries.ts`), shared models
@@ -31,7 +33,8 @@ Browser / Gity
 
 ## Stack
 
-Next.js (App Router) · TypeScript (strict) · Tailwind CSS · shadcn-style UI · TanStack Query ·
+Cloudflare Pages (hosting) + Pages Functions (login exchange) · Next.js (App Router,
+static export) · TypeScript (strict) · Tailwind CSS · shadcn-style UI · TanStack Query ·
 Recharts · Lucide icons. Dark mode first.
 
 ## Local setup
@@ -46,27 +49,38 @@ That's it — no server configuration, no env secrets.
 
 ## Login options
 
-**Personal access token (the supported sign-in).** A fine-grained PAT pasted in the
-browser, stored in localStorage or sessionStorage. Full data access, including private
-repos. See “Creating a fine-grained GitHub PAT” below for the minimum permissions.
+**1. Connect with GitHub (recommended).** One-click PKCE login → `ghu_` user token with
+the app's read permissions. Works for public and private repos, auto-refreshes while the
+tab is open. Requires the one-time deployer setup below.
 
-### Why no “Sign in with GitHub” button?
+**2. Personal access token.** Fine-grained PAT pasted in the browser, stored in
+localStorage or sessionStorage. Identical data access — the offline-capable fallback.
 
-We tried — and GitHub's platform says no. A static site has no backend, so the normal
-OAuth web flow (needs a `client_secret`) is impossible, and the Device Flow fallback
-(which needs only a public Client ID) is also unusable from a browser: we verified that
-`github.com/login/device/code` sends **no CORS headers**, so every browser `fetch` to it
-fails, while `api.github.com` explicitly allows browser origins (`access-control-allow-origin: *`).
-GitHub only intends those login endpoints for servers/CLIs. One-click login would require
-a small token-exchange backend, which Gity deliberately doesn't have — the PAT path gives
-identical access with zero infrastructure.
+### Enabling “Connect with GitHub” (deployer setup, one time)
 
-## Hosting on GitHub Pages
+GitHub requires a `client_secret` to exchange login codes, so the swap happens in
+`functions/api/*` (the only server-side code in Gity):
 
-Gity builds as a fully static export (`output: "export"` → `out/`). Pushing to `main`
-triggers `.github/workflows/deploy.yml`, which builds and deploys via GitHub Actions.
-One-time repo setup: **Settings → Pages → Source: “GitHub Actions”**. The workflow sets
-the project-pages base path (`/<repo>`) automatically; nothing else to configure.
+1. On your GitHub App (`gity-command-center`): add a **Callback URL**
+   `https://<your-pages-domain>/auth/callback/` and generate a **client secret**.
+2. In Cloudflare dashboard → Pages project → Settings → Environment variables:
+   - `GITHUB_CLIENT_ID` = `Iv1.…` (plain variable — Client IDs are public).
+   - `GITHUB_CLIENT_SECRET` = the secret ( **Encrypt** it).
+3. Redeploy (automatic on push). Users click “Connect with GitHub”, approve, and land
+   back in the dashboard — no token pasting.
+
+## Hosting on Cloudflare
+
+Gity builds as a fully static export (`output: "export"` → `out/`) plus `functions/`.
+Deploy via the Cloudflare dashboard (free, no repo secrets needed):
+
+1. Cloudflare dashboard → **Workers & Pages → Create → Pages → Connect to Git** →
+   select `Patel230/gity`.
+2. Build settings: framework preset **Next.js (Static HTML Export)**, build command
+   `npm run build`, output directory `out`. (Root is the repo root.)
+3. Every push to `main` redeploys automatically, with preview URLs per PR.
+4. Add the `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` environment variables as above
+   to enable login, then register the Callback URL on the GitHub App.
 
 ## Creating a fine-grained GitHub PAT
 
