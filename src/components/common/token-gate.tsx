@@ -1,14 +1,30 @@
 "use client";
 
-import { KeyRound, ShieldAlert } from "lucide-react";
+import { KeyRound, Loader, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { authWorkerUrl, startLogin } from "@/lib/oauth";
 
-/** Rendered when no token is stored — PAT sign-in (the supported browser path). */
+/** Rendered when no token is stored — GitHub login preferred, PAT fallback. */
 export function TokenGate({ onSave }: { onSave: (token: string) => void }) {
   const [value, setValue] = useState("");
+  const [showPat, setShowPat] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const workerConfigured = authWorkerUrl().length > 0;
+
+  const connect = async () => {
+    setBusy(true);
+    setLoginError(null);
+    try {
+      await startLogin(); // redirects to github.com
+    } catch (e) {
+      setLoginError(e instanceof Error ? e.message : "Could not start login.");
+      setBusy(false);
+    }
+  };
   return (
     <div className="mx-auto flex min-h-[70vh] w-full max-w-md flex-col justify-center px-4">
       <div className="mb-6 text-center">
@@ -28,20 +44,44 @@ export function TokenGate({ onSave }: { onSave: (token: string) => void }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Input
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="github_pat_… or ghp_…"
-            value={value}
-            onChange={(e) => setValue(e.target.value.trim())}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && value) onSave(value);
-            }}
-          />
-          <Button className="w-full" disabled={!value} onClick={() => onSave(value)}>
-            Save token locally
-          </Button>
+          {workerConfigured ? (
+            <>
+              <Button className="w-full" onClick={connect} disabled={busy}>
+                {busy ? <Loader className="size-4 animate-spin" /> : null}
+                {busy ? "Redirecting to GitHub…" : "Connect with GitHub"}
+              </Button>
+              {loginError && (
+                <p className="text-xs text-[var(--destructive)]">{loginError}</p>
+              )}
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <span className="h-px flex-1 bg-border" />
+                or use a personal access token
+                <span className="h-px flex-1 bg-border" />
+              </div>
+            </>
+          ) : null}
+          {(!workerConfigured || showPat) ? (
+            <>
+              <Input
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="github_pat_… or ghp_…"
+                value={value}
+                onChange={(e) => setValue(e.target.value.trim())}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && value) onSave(value);
+                }}
+              />
+              <Button className="w-full" disabled={!value} onClick={() => onSave(value)}>
+                Save token locally
+              </Button>
+            </>
+          ) : (
+            <Button variant="secondary" className="w-full" onClick={() => setShowPat(true)}>
+              Paste a token instead
+            </Button>
+          )}
           <p className="text-[11px] leading-relaxed text-muted-foreground">
             No token yet? GitHub → Settings → Developer settings → Personal access tokens →
             Fine-grained tokens. See Settings for the minimum read permissions.

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { OAuthCard } from "@/components/common/oauth-card";
 import { RateLimitPanel } from "@/components/common/rate-limit";
 import { PageHead } from "@/app/page";
 import { useAuth, useViewerUser, type StorageMode } from "@/lib/auth";
@@ -51,20 +52,7 @@ export default function SettingsPage() {
         </span>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Why is there no “Sign in with GitHub” button?
-          </CardTitle>
-          <CardDescription>
-            GitHub&apos;s login endpoints send no CORS headers, so no pure-browser app can
-            complete OAuth or Device Flow — only api.github.com accepts browser requests.
-            A personal access token gives identical access (public + private repos) and is
-            the supported sign-in for this static site. One-click login would require a
-            small token-exchange backend, which Gity deliberately doesn&apos;t have.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <OAuthCard />
 
       <Card>
         <CardHeader>
