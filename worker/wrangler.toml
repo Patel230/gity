@@ -1,9 +1,0 @@
-name = "gity-auth"
-main = "src/index.ts"
-compatibility_date = "2026-09-01"
-
-# Public values (safe to commit). Secrets via `wrangler secret put`:
-#   GITHUB_CLIENT_SECRET  (from the GitHub App settings page)
-[vars]
-GITHUB_CLIENT_ID = "Iv23lir5YazVIYK31HoN"
-ALLOWED_ORIGIN = "https://patel230.github.io"
