@@ -8,6 +8,7 @@ import {
   Play,
   Database,
   Settings,
+  Bot,
 } from "lucide-react";
 
 export const NAV = [
@@ -19,6 +20,7 @@ export const NAV = [
   { href: "/actions", label: "Actions", icon: Play },
   { href: "/activity", label: "Activity", icon: Activity },
   { href: "/streak", label: "Streak", icon: Flame },
+  { href: "/agents", label: "Agents", icon: Bot },
 ] as const;
 
 export const SETTINGS_NAV = { href: "/settings", label: "Settings", icon: Settings };
