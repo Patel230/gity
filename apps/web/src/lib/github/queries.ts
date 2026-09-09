@@ -323,6 +323,38 @@ export function allIssuesOptions(
   });
 }
 
+/**
+ * Delta fetchers for incremental sync: everything involving the viewer that
+ * changed on/after a given day. Deltas are almost always a single fast page.
+ * Returned UNFILTERED (any state) so the merge step can move items between
+ * buckets (e.g. open → merged); callers apply their bucket filter after merge.
+ */
+export async function fetchPrDelta(
+  token: string,
+  login: string,
+  sinceYMD: string,
+): Promise<GithubPullRequest[]> {
+  const { prs } = await fetchSearchPrsAndIssues(
+    token,
+    `is:pr involves:${login} updated:>=${sinceYMD}`,
+    { maxPages: 10 },
+  );
+  return prs;
+}
+
+export async function fetchIssueDelta(
+  token: string,
+  login: string,
+  sinceYMD: string,
+): Promise<GithubIssue[]> {
+  const { issues } = await fetchSearchPrsAndIssues(
+    token,
+    `is:issue involves:${login} updated:>=${sinceYMD}`,
+    { maxPages: 10 },
+  );
+  return issues;
+}
+
 /** Latest workflow run per repo for the most recently pushed repos (bounded). */
 export function workflowRunsOptions(
   token: string | null,

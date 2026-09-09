@@ -137,8 +137,11 @@ We deliberately call this “Live Refresh”, never “real-time”, in the UI.
   bounded per-repo fan-out (CI states, workflow runs), paginated-but-capped search windows,
   and polling that pauses when the tab is hidden.
 - PR/issue aggregation uses the issue-search index (`involves:`) plus detailed per-repo
-  fetches for the most active repos; the search index caps at ~1,000 results, which is
-  surfaced honestly in the UI counts.
+  fetches for the most active repos; the search index caps at ~1,000 results.
+- **Incremental sync, not full search every time:** the first PR/issue listing fetches
+  every page once and records a sync marker; later syncs fetch only items updated
+  since that day (`updated:>=YYYY-MM-DD`) and merge by id. The manual Refresh button
+  clears markers for a true full re-sync (heals deleted/transferred items).
 
 ## Gity Activity Streak
 

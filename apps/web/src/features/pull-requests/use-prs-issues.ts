@@ -1,15 +1,37 @@
 "use client";
 
 import { useAuth, useViewerUser } from "@/lib/auth";
-import { allIssuesOptions, mergedPrsOptions, openPrsOptions, reposOptions } from "@/lib/github/queries";
-import { useLiveQuery } from "../use-github";
+import {
+  allIssuesOptions,
+  fetchIssueDelta,
+  fetchPrDelta,
+  mergedPrsOptions,
+  openPrsOptions,
+  reposOptions,
+} from "@/lib/github/queries";
+import type { GithubIssue, GithubPullRequest } from "@/lib/github/types";
+import { useDeltaSearch, useLiveQuery } from "../use-github";
+
+const isOpenPr = (p: GithubPullRequest) => p.state === "open" || p.state === "draft";
+const isMergedPr = (p: GithubPullRequest) => p.state === "merged" || p.state === "closed";
 
 export function usePullRequests() {
   const { token, fingerprint: fp } = useAuth();
   const viewer = useViewerUser();
+  const login = viewer.data?.login;
   const reposQ = useLiveQuery({ ...reposOptions(token, fp) });
-  const openQ = useLiveQuery({ ...openPrsOptions(token, fp, viewer.data?.login, reposQ.data) });
-  const mergedQ = useLiveQuery({ ...mergedPrsOptions(token, fp, viewer.data?.login) });
+  const openQ = useDeltaSearch<GithubPullRequest>(
+    { ...openPrsOptions(token, fp, login, reposQ.data) },
+    "prs-open",
+    (since) => fetchPrDelta(token!, login!, since),
+    (all) => all.filter(isOpenPr),
+  );
+  const mergedQ = useDeltaSearch<GithubPullRequest>(
+    { ...mergedPrsOptions(token, fp, login) },
+    "prs-merged",
+    (since) => fetchPrDelta(token!, login!, since),
+    (all) => all.filter(isMergedPr),
+  );
 
   const prs = [...(openQ.data ?? []), ...(mergedQ.data ?? [])];
   const seen = new Set<string>();
@@ -28,8 +50,14 @@ export function usePullRequests() {
 export function useIssues() {
   const { token, fingerprint: fp } = useAuth();
   const viewer = useViewerUser();
+  const login = viewer.data?.login;
   const reposQ = useLiveQuery({ ...reposOptions(token, fp) });
-  const issuesQ = useLiveQuery({ ...allIssuesOptions(token, fp, viewer.data?.login) });
+  const issuesQ = useDeltaSearch<GithubIssue>(
+    { ...allIssuesOptions(token, fp, login) },
+    "issues",
+    (since) => fetchIssueDelta(token!, login!, since),
+    (all) => all,
+  );
 
   return {
     issues: (issuesQ.data ?? []).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { Pause, Play, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { clearAllSync } from "@/lib/github/sync-store";
 import { POLL_LABEL, usePrefs } from "@/lib/preferences";
 
 function useNow(stepMs = 1000): number {
@@ -64,9 +65,14 @@ export function RefreshControl({ lastUpdatedAt }: { lastUpdatedAt?: number }) {
       <Button
         size="sm"
         variant="secondary"
-        onClick={() => qc.invalidateQueries({ queryKey: ["gity"] })}
+        onClick={() => {
+          // Manual Refresh forces a TRUE full re-sync (clears delta markers),
+          // healing any drift like deleted or transferred items.
+          clearAllSync();
+          qc.invalidateQueries({ queryKey: ["gity"] });
+        }}
         disabled={fetching > 0}
-        title="Refetch all GitHub data now"
+        title="Refetch all GitHub data now (full re-sync)"
       >
         <RefreshCw className={fetching > 0 ? "size-3.5 animate-spin" : "size-3.5"} />
         Refresh
