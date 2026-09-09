@@ -112,7 +112,12 @@ const TOOLS: Tool[] = [
 ];
 
 function headers(origin: string | undefined): Headers {
-  const result = new Headers({ "Content-Type": "application/json", "Cache-Control": "no-store" });
+  const result = new Headers({
+    "Content-Type": "application/json",
+    "Cache-Control": "no-store",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+  });
   if (origin) {
     result.set("Access-Control-Allow-Origin", origin);
     result.set("Vary", "Origin");
@@ -138,19 +143,49 @@ function base64url(value: ArrayBuffer | string): string {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-function pemToBytes(pem: string): ArrayBuffer {
-  const value = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, "");
+function pemToBytes(pem: string): { bytes: ArrayBuffer; format: "pkcs8" | "pkcs1" } {
+  const format = pem.includes("BEGIN RSA PRIVATE KEY") ? "pkcs1" : "pkcs8";
+  const value = pem.replace(/-----BEGIN (?:RSA )?PRIVATE KEY-----|-----END (?:RSA )?PRIVATE KEY-----|\s/g, "");
   const binary = atob(value);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes.buffer;
+  return { bytes: bytes.buffer, format };
+}
+
+function derLength(length: number): Uint8Array {
+  if (length < 128) return new Uint8Array([length]);
+  const bytes: number[] = [];
+  for (let value = length; value > 0; value >>>= 8) bytes.unshift(value & 0xff);
+  return new Uint8Array([0x80 | bytes.length, ...bytes]);
+}
+
+function wrapPkcs1AsPkcs8(pkcs1: ArrayBuffer): ArrayBuffer {
+  const algorithm = new Uint8Array([0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00]);
+  const version = new Uint8Array([0x02, 0x01, 0x00]);
+  const key = new Uint8Array(pkcs1);
+  const octetLength = derLength(key.length);
+  const octet = new Uint8Array(1 + octetLength.length + key.length);
+  octet[0] = 0x04;
+  octet.set(octetLength, 1);
+  octet.set(key, 1 + octetLength.length);
+  const body = new Uint8Array(version.length + algorithm.length + octet.length);
+  body.set(version, 0);
+  body.set(algorithm, version.length);
+  body.set(octet, version.length + algorithm.length);
+  const sequenceLength = derLength(body.length);
+  const result = new Uint8Array(1 + sequenceLength.length + body.length);
+  result[0] = 0x30;
+  result.set(sequenceLength, 1);
+  result.set(body, 1 + sequenceLength.length);
+  return result.buffer;
 }
 
 async function createAppJwt(env: Env): Promise<string> {
   if (!env.GITHUB_APP_ID || !env.GITHUB_APP_PRIVATE_KEY) throw new Error("GitHub App credentials are not configured.");
+  const privateKey = pemToBytes(env.GITHUB_APP_PRIVATE_KEY);
   const key = await crypto.subtle.importKey(
     "pkcs8",
-    pemToBytes(env.GITHUB_APP_PRIVATE_KEY),
+    privateKey.format === "pkcs1" ? wrapPkcs1AsPkcs8(privateKey.bytes) : privateKey.bytes,
     { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
     false,
     ["sign"],
@@ -255,16 +290,16 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, env);
 
   let body: JsonRpcRequest;
-  const contentLength = Number(request.headers.get("content-length") ?? "0");
-  if (contentLength > MAX_REQUEST_BYTES) return error(null, -32600, "Request is too large.", env);
   try {
-    body = (await request.json()) as JsonRpcRequest;
+    const rawBody = await request.text();
+    if (new TextEncoder().encode(rawBody).byteLength > MAX_REQUEST_BYTES) return error(null, -32600, "Request is too large.", env);
+    body = JSON.parse(rawBody) as JsonRpcRequest;
   } catch {
     return error(null, -32700, "Invalid JSON.", env);
   }
   if (body.jsonrpc !== "2.0" || typeof body.method !== "string") return error(body.id, -32600, "Invalid JSON-RPC request.", env);
-  if (body.method === "initialize") return new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id ?? null, result: { protocolVersion: "2025-06-18", serverInfo: { name: "gity", version: "1" }, capabilities: { tools: {} } } }), { headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
-  if (body.method === "tools/list") return new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id ?? null, result: { tools: TOOLS } }), { headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+  if (body.method === "initialize") return json({ jsonrpc: "2.0", id: body.id ?? null, result: { protocolVersion: "2025-06-18", serverInfo: { name: "gity", version: "1" }, capabilities: { tools: {} } } }, 200, env);
+  if (body.method === "tools/list") return json({ jsonrpc: "2.0", id: body.id ?? null, result: { tools: TOOLS } }, 200, env);
   if (body.method !== "tools/call") return error(body.id, -32601, "Method not found.", env);
 
   const params = body.params ?? {};
@@ -274,7 +309,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
   try {
     const token = await createInstallationToken(env);
     const result = await callTool(name, (args ?? {}) as Record<string, unknown>, token);
-    return new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id ?? null, result: { content: [{ type: "text", text: JSON.stringify(result) }] } }), { headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+    return json({ jsonrpc: "2.0", id: body.id ?? null, result: { content: [{ type: "text", text: JSON.stringify(result) }] } }, 200, env);
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : "Agent tool failed.";
     return error(body.id, -32000, message, env);
