@@ -86,9 +86,9 @@ export async function restFetch<T>(
     });
   } catch (e) {
     throw new GithubApiError(
-      "network",
+      "blocked",
       0,
-      e instanceof Error ? `Network error: ${e.message}` : "Network error contacting GitHub.",
+      "Request to GitHub was blocked before it completed (the browser reports CORS/network failure). This is almost always a local blocker — ad-blocker, privacy extension, VPN, firewall, or antivirus — not a Gity bug. See Settings → Connection test.",
     );
   }
   recordRestRateLimit(res.headers);
@@ -157,9 +157,9 @@ export async function graphqlFetch<T>(
     });
   } catch (e) {
     throw new GithubApiError(
-      "network",
+      "blocked",
       0,
-      e instanceof Error ? `Network error: ${e.message}` : "Network error contacting GitHub.",
+      "Request to GitHub was blocked before it completed (the browser reports CORS/network failure). This is almost always a local blocker — ad-blocker, privacy extension, VPN, firewall, or antivirus — not a Gity bug. See Settings → Connection test.",
     );
   }
   recordRestRateLimit(res.headers, "rest");

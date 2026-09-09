@@ -64,6 +64,17 @@ export function ErrorState({
         <Timer className="size-3.5" /> Retry
       </Button>
     ) : null;
+  } else if (kind === "blocked") {
+    title = "Request blocked before reaching GitHub";
+    hint =
+      "Your browser couldn't complete the request (shows as a CORS/network error in the console). GitHub's API itself allows browser calls — so this is a local blocker: an ad-blocker or privacy extension, Brave Shields, VPN, corporate firewall, or antivirus. Try an incognito window with extensions off, or another network. Details in Settings → Connection test.";
+    action = (
+      <Link href="/settings">
+        <Button size="sm" variant="secondary">
+          Open Connection test
+        </Button>
+      </Link>
+    );
   } else if (onRetry) {
     action = (
       <Button size="sm" variant="secondary" onClick={onRetry}>

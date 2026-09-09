@@ -177,6 +177,7 @@ export type GithubErrorKind =
   | "not-found"
   | "validation"
   | "server"
+  | "blocked"
   | "network";
 
 export class GithubApiError extends Error {

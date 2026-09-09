@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RateLimitPanel } from "@/components/common/rate-limit";
+import { ConnectionTest } from "@/components/common/connection-test";
 import { PageHead } from "@/app/page";
 import { useAuth, useViewerUser, type StorageMode } from "@/lib/auth";
 import { checkToken } from "@/lib/github/rest";
@@ -171,6 +172,8 @@ export default function SettingsPage() {
           <RateLimitPanel />
         </CardContent>
       </Card>
+
+      <ConnectionTest />
 
       <Card>
         <CardHeader>
