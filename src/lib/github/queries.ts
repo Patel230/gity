@@ -162,7 +162,7 @@ export function openPrsOptions(
         try {
           const { prs } = await fetchSearchPrsAndIssues(
             token!,
-            `involves:${login} sort:updated-desc`,
+            `is:pr involves:${login} sort:updated-desc`,
             { maxPages: 3 },
           );
           for (const pr of prs.filter(
@@ -217,7 +217,7 @@ export function mergedPrsOptions(
       try {
         const { prs } = await fetchSearchPrsAndIssues(
           token!,
-          `involves:${login} sort:updated-desc`,
+          `is:pr involves:${login} sort:updated-desc`,
           { maxPages: 3 },
         );
         return prs.filter((p) => p.state === "merged" || p.state === "closed");
@@ -247,7 +247,7 @@ export function allIssuesOptions(
       try {
         const { issues } = await fetchSearchPrsAndIssues(
           token!,
-          `involves:${login} sort:updated-desc`,
+          `is:issue involves:${login} sort:updated-desc`,
           { maxPages: 3 },
         );
         return issues;
