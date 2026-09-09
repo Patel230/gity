@@ -7,12 +7,14 @@ import { AppShell } from "@/components/layout/app-shell";
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin"],
+  preload: false,
 });
 
 const ibmPlexMono = IBM_Plex_Mono({
   variable: "--font-ibm-plex-mono",
   weight: "400",
   subsets: ["latin"],
+  preload: false,
 });
 
 export const metadata: Metadata = {
