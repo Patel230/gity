@@ -32,6 +32,9 @@ export async function onRequest({ request }: { request: Request }): Promise<Resp
   const contentType = request.headers.get("content-type");
   if (authorization) headers.set("Authorization", authorization);
   if (contentType) headers.set("Content-Type", contentType);
+  else if (request.method !== "GET" && request.method !== "HEAD") {
+    headers.set("Content-Type", "application/json");
+  }
 
   let body: ArrayBuffer | undefined;
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -43,16 +46,19 @@ export async function onRequest({ request }: { request: Request }): Promise<Resp
   }
 
   let upstream: Response | undefined;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       upstream = await fetch(target, {
         method: request.method,
         headers,
         body,
       });
-      break;
+      if (![502, 503, 504].includes(upstream.status) || attempt === 2) break;
+      // GitHub's edge can briefly return gateway errors during high fan-out
+      // dashboard loads. Retry those responses before exposing a failure.
+      await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
     } catch {
-      if (attempt === 1) return Response.json({ error: "upstream_unreachable" }, { status: 502 });
+      if (attempt === 2) return Response.json({ error: "upstream_unreachable" }, { status: 502 });
     }
   }
   if (!upstream) return Response.json({ error: "upstream_unreachable" }, { status: 502 });
