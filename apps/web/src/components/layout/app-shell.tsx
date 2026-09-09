@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { LogOut, Menu, Moon, Sun, X } from "lucide-react";
+import { Menu, Moon, Sun, X } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth, useViewerUser } from "@/lib/auth";
@@ -40,7 +40,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
       <div className="flex min-w-0 flex-1 flex-col">
-        <Header onMenu={() => setSidebarOpen(true)} onLogout={clearToken} />
+        <Header onMenu={() => setSidebarOpen(true)} />
         <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-5 sm:px-5">{children}</main>
         <footer className="border-t border-border px-4 py-2 text-center text-[11px] text-muted-foreground">
           Gity — frontend-only GitHub command center. Data lives on GitHub; your token never
@@ -63,8 +63,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
 function SidebarBody({ onNavigate }: { onNavigate: () => void }) {
   const pathname = usePathname();
-  const { clearToken } = useAuth();
-  const viewer = useViewerUser();
   return (
     <>
       <div className="px-4 pb-3 pt-4"><BrandLogo /></div>
@@ -79,7 +77,7 @@ function SidebarBody({ onNavigate }: { onNavigate: () => void }) {
               onClick={onNavigate}
               className={cn(
                 "group flex items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-[13px] text-muted-foreground hover:bg-accent/70 hover:text-foreground",
-                active && "mx-1 gap-3.5 rounded-[20px] bg-[color-mix(in_srgb,var(--primary)_15%,transparent)] px-4 py-4 text-[15px] font-medium text-foreground shadow-[inset_5px_0_var(--primary)]",
+                active && "nav-active mx-1 gap-3.5 rounded-[20px] bg-[color-mix(in_srgb,var(--primary)_15%,transparent)] px-4 py-4 text-[15px] font-medium text-foreground",
               )}
             >
               <item.icon className={cn(active ? "size-5" : "size-4", "shrink-0", active ? "text-[var(--primary)]" : "group-hover:text-[var(--primary)]")} />
@@ -93,47 +91,27 @@ function SidebarBody({ onNavigate }: { onNavigate: () => void }) {
           onClick={onNavigate}
           className={cn(
             "group flex items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-[13px] text-muted-foreground hover:bg-accent/70 hover:text-foreground",
-            pathname.startsWith(SETTINGS_NAV.href) && "mx-1 gap-3.5 rounded-[20px] bg-[color-mix(in_srgb,var(--primary)_15%,transparent)] px-4 py-4 text-[15px] font-medium text-foreground shadow-[inset_5px_0_var(--primary)]",
+            pathname.startsWith(SETTINGS_NAV.href) && "nav-active mx-1 gap-3.5 rounded-[20px] bg-[color-mix(in_srgb,var(--primary)_15%,transparent)] px-4 py-4 text-[15px] font-medium text-foreground",
           )}
         >
           <SETTINGS_NAV.icon className={cn("size-4 shrink-0", pathname.startsWith(SETTINGS_NAV.href) ? "text-[var(--primary)]" : "group-hover:text-[var(--primary)]")} />
           {SETTINGS_NAV.label}
         </Link>
       </nav>
-      <div className="border-t border-border p-3">
-        <div className="flex items-center gap-2">
-          <Link href="/profile" className="flex min-w-0 flex-1 items-center gap-2 rounded-lg p-1 -m-1 hover:bg-accent/70">
-          <Avatar src={viewer.data?.avatarUrl} alt={viewer.data?.login ?? "?"} />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium">{viewer.data?.login ?? "…"}</p>
-            <p className="truncate text-[11px] text-muted-foreground">
-              {viewer.data?.name ?? "GitHub user"}
-            </p>
-          </div>
-          </Link>
-          <button
-            onClick={clearToken}
-            title="Remove token (sign out)"
-            className="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-          >
-            <LogOut className="size-3.5" />
-          </button>
-        </div>
-      </div>
     </>
   );
 }
 
-function Header({ onMenu, onLogout }: { onMenu: () => void; onLogout: () => void }) {
+function Header({ onMenu }: { onMenu: () => void }) {
   const pathname = usePathname();
+  const viewer = useViewerUser();
   const { appearance, setAppearance } = usePrefs();
   const palette = usePaletteData();
   const current = [...NAV, SETTINGS_NAV].find((item) =>
     item.href === "/" ? pathname === "/" : pathname.startsWith(item.href),
   );
-  void onLogout;
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border/70 bg-background/75 px-3 backdrop-blur-xl sm:px-5">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b border-border/70 bg-background/85 px-3 backdrop-blur-xl sm:gap-3 sm:px-5">
       <Button size="icon" variant="ghost" className="lg:hidden" onClick={onMenu} aria-label="Menu">
         <Menu className="size-4" />
       </Button>
@@ -156,6 +134,9 @@ function Header({ onMenu, onLogout }: { onMenu: () => void; onLogout: () => void
       >
         {appearance === "dark" ? <Sun className="size-4 text-[var(--primary)]" /> : <Moon className="size-4 text-[var(--primary)]" />}
       </Button>
+      <Link href="/settings" className="rounded-full p-0.5 hover:bg-accent" title="Open account settings" aria-label="Open account settings">
+        <Avatar src={viewer.data?.avatarUrl} alt={viewer.data?.login ?? "GitHub profile"} className="size-8" />
+      </Link>
     </header>
   );
 }

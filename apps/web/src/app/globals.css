@@ -91,6 +91,20 @@ body {
   filter: invert(1);
 }
 
+.nav-active {
+  position: relative;
+}
+
+.nav-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 16px;
+  bottom: 16px;
+  width: 5px;
+  background: var(--primary);
+}
+
 h1, h2, h3 { font-family: var(--font-display); }
 
 ::selection {

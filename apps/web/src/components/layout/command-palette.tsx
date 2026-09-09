@@ -67,10 +67,10 @@ export function CommandPalette({ data }: { data: PaletteData }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="hidden h-8 w-56 items-center gap-2 rounded-md border border-input bg-transparent px-2.5 text-xs text-muted-foreground hover:bg-accent md:inline-flex"
+        className="hidden h-8 w-64 min-w-0 items-center gap-2 rounded-md border border-input bg-transparent px-2.5 text-xs text-muted-foreground hover:bg-accent md:inline-flex"
       >
         <Search className="size-3.5" />
-        <span className="flex-1 text-left">Search repos, PRs, issues…</span>
+        <span className="min-w-0 flex-1 truncate whitespace-nowrap text-left">Search repos, PRs, issues…</span>
         <kbd className="rounded border border-border px-1 font-mono text-[10px]">⌘K</kbd>
       </button>
       <button

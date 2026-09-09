@@ -8,12 +8,10 @@ import {
   Play,
   Database,
   Settings,
-  UserRound,
 } from "lucide-react";
 
 export const NAV = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
-  { href: "/profile", label: "Profile", icon: UserRound },
   { href: "/organizations", label: "Orgs", icon: Building2 },
   { href: "/repositories", label: "Repos", icon: Database },
   { href: "/pull-requests", label: "PRs", icon: GitPullRequest },

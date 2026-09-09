@@ -28,7 +28,7 @@ export function RateLimitBadge() {
   return (
     <span
       title={title}
-      className={cn("inline-flex cursor-help items-center gap-1 font-mono text-[11px] tabular-nums", tone)}
+      className={cn("inline-flex cursor-help items-center gap-1.5 rounded-full border border-border/70 bg-card/50 px-2.5 py-1 font-mono text-[11px] tabular-nums", tone)}
     >
       <Gauge className="size-3.5" />
       {share == null ? "limit —" : `${Math.round(share * 100)}%`}
