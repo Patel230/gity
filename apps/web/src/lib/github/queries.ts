@@ -32,21 +32,23 @@ import type {
   GithubWorkflowRun,
 } from "./types";
 
-/** Non-reversible token fingerprint for query keys (never the token itself). */
-async function tokenFingerprint(token: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")
-    .slice(0, 16);
-}
-
-export async function queryKeyBase(token: string): Promise<string[]> {
-  try {
-    return ["gity", await tokenFingerprint(token)];
-  } catch {
-    return ["gity", `len-${token.length}`];
+/**
+ * Synchronous token fingerprint for query keys (never the token itself).
+ * cyrb53: 53-bit, non-crypto — plenty for cache namespacing, and crucially
+ * synchronous, so the fingerprint is final on the very first render and
+ * queries never fire a wasted wave under a placeholder key.
+ */
+export function tokenFingerprint(token: string): string {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < token.length; i++) {
+    const ch = token.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
   }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (h2 >>> 0).toString(16).padStart(8, "0") + (h1 >>> 0).toString(16).padStart(8, "0");
 }
 
 export const qk = {
@@ -82,6 +84,17 @@ function depthPages(depth: SearchDepth): number {
 }
 
 /**
+ * Server-side sort is only requested for head queries, where recency order
+ * decides WHICH 100 items we keep. Full queries enumerate every page anyway
+ * and every consumer sorts client-side — skipping the global sort makes
+ * GitHub's search pages return noticeably faster.
+ */
+function searchQuery(kind: "pr" | "issue", login: string, depth: SearchDepth): string {
+  const sort = depth === "head" ? " sort:updated-desc" : "";
+  return `is:${kind} involves:${login}${sort}`;
+}
+
+/**
  * Refresh tiers.
  * - LIVE (workflow runs, events): follow the user's Live Refresh poll — cheap
  *   REST calls with high signal value, so they stay on the 15s–5m interval.
@@ -91,6 +104,20 @@ function depthPages(depth: SearchDepth): number {
  *   the whole app on 429s. Spread CALM into a builder's options to opt out.
  */
 const CALM = { refetchInterval: false as const };
+
+/**
+ * Retry policy: transient failures (network hiccups, GitHub 5xx) get a second
+ * chance with backoff. Auth, permission, and rate-limit failures NEVER retry —
+ * retrying a 429 only deepens the hole and stalls the whole dashboard.
+ */
+function retryPolicy(count: number, err: { kind: string }): boolean {
+  return (
+    count < 2 &&
+    err.kind !== "auth" &&
+    err.kind !== "forbidden" &&
+    err.kind !== "rate-limit"
+  );
+}
 
 /* ------------------------------- options ---------------------------------- */
 
@@ -102,8 +129,7 @@ export function viewerOptions(token: string | null, fp: string) {
     enabled: !!token,
     staleTime: 10 * 60_000,
     gcTime: 30 * 60_000,
-    retry: (count, err) =>
-      count < 2 && err.kind !== "auth" && err.kind !== "forbidden",
+    retry: (count, err) => retryPolicy(count, err),
   });
 }
 
@@ -115,8 +141,7 @@ export function orgsOptions(token: string | null, fp: string) {
     enabled: !!token,
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
-    retry: (count, err) =>
-      count < 2 && err.kind !== "auth" && err.kind !== "forbidden",
+    retry: (count, err) => retryPolicy(count, err),
   });
 }
 
@@ -128,8 +153,7 @@ export function reposOptions(token: string | null, fp: string) {
     enabled: !!token,
     staleTime: 60_000,
     gcTime: 15 * 60_000,
-    retry: (count, err) =>
-      count < 2 && err.kind !== "auth" && err.kind !== "forbidden",
+    retry: (count, err) => retryPolicy(count, err),
   });
 }
 
@@ -167,7 +191,7 @@ export function ciStatesOptions(
     enabled: !!token && targets.length > 0,
     staleTime: 60_000,
     gcTime: 10 * 60_000,
-    retry: 1,
+    retry: (count, err) => retryPolicy(count, err),
   });
 }
 
@@ -197,7 +221,7 @@ export function openPrsOptions(
         try {
           const { prs } = await fetchSearchPrsAndIssues(
             token!,
-            `is:pr involves:${login} sort:updated-desc`,
+            searchQuery("pr", login, depth),
             { maxPages: depthPages(depth) },
           );
           for (const pr of prs.filter(
@@ -234,8 +258,7 @@ export function openPrsOptions(
     enabled: !!token && !!login,
     staleTime: 60_000,
     gcTime: 10 * 60_000,
-    retry: (count, err) =>
-      count < 2 && err.kind !== "auth" && err.kind !== "forbidden",
+    retry: (count, err) => retryPolicy(count, err),
   });
 }
 
@@ -254,7 +277,7 @@ export function mergedPrsOptions(
       try {
         const { prs } = await fetchSearchPrsAndIssues(
           token!,
-          `is:pr involves:${login} sort:updated-desc`,
+          searchQuery("pr", login, depth),
           { maxPages: depthPages(depth) },
         );
         return prs.filter((p) => p.state === "merged" || p.state === "closed");
@@ -266,8 +289,7 @@ export function mergedPrsOptions(
     enabled: !!token && !!login,
     staleTime: 60_000,
     gcTime: 10 * 60_000,
-    retry: (count, err) =>
-      count < 2 && err.kind !== "auth" && err.kind !== "forbidden",
+    retry: (count, err) => retryPolicy(count, err),
   });
 }
 
@@ -286,7 +308,7 @@ export function allIssuesOptions(
       try {
         const { issues } = await fetchSearchPrsAndIssues(
           token!,
-          `is:issue involves:${login} sort:updated-desc`,
+          searchQuery("issue", login, depth),
           { maxPages: depthPages(depth) },
         );
         return issues;
@@ -297,8 +319,7 @@ export function allIssuesOptions(
     enabled: !!token && !!login,
     staleTime: 60_000,
     gcTime: 10 * 60_000,
-    retry: (count, err) =>
-      count < 2 && err.kind !== "auth" && err.kind !== "forbidden",
+    retry: (count, err) => retryPolicy(count, err),
   });
 }
 
@@ -337,7 +358,7 @@ export function workflowRunsOptions(
     enabled: !!token && targets.length > 0,
     staleTime: 30_000,
     gcTime: 10 * 60_000,
-    retry: 1,
+    retry: (count, err) => retryPolicy(count, err),
   });
 }
 
@@ -352,7 +373,7 @@ export function eventsOptions(
     enabled: !!token && !!login,
     staleTime: 60_000,
     gcTime: 10 * 60_000,
-    retry: 1,
+    retry: (count, err) => retryPolicy(count, err),
   });
 }
 
@@ -392,7 +413,7 @@ export function contributionsOptions(
     enabled: !!token && !!login,
     staleTime: 10 * 60_000,
     gcTime: 30 * 60_000,
-    retry: 1,
+    retry: (count, err) => retryPolicy(count, err),
   });
 }
 

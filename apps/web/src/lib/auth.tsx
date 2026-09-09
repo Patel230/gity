@@ -22,7 +22,7 @@ import {
   type ReactNode,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { queryKeyBase, viewerOptions } from "./github/queries";
+import { tokenFingerprint, viewerOptions } from "./github/queries";
 import { resetRateLimits } from "./github/rate-limit";
 import { refreshTokens } from "./oauth";
 
@@ -103,7 +103,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [oauth, setOauth] = useState<OAuthMeta | null>(null);
   const [storageMode, setStorageMode] = useState<StorageMode>("local");
   const [fingerprint, setFingerprint] = useState("anon");
-  const [hydrated, setHydrated] = useState(false);
   const refreshing = useRef(false);
 
   useEffect(() => {
@@ -112,19 +111,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setKind(stored.kind);
     setOauth(stored.oauth);
     setStorageMode(stored.mode);
-    setHydrated(true);
+    // Fingerprint is synchronous, so token + fp land in the SAME render —
+    // queries fire exactly once under their final keys (no placeholder wave).
+    setFingerprint(stored.token ? tokenFingerprint(stored.token) : "anon");
   }, []);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    if (!token) {
-      setFingerprint("anon");
-      return;
-    }
-    queryKeyBase(token)
-      .then(([_, fp]) => setFingerprint(fp))
-      .catch(() => setFingerprint(`len-${token.length}`));
-  }, [token, hydrated]);
 
   const setToken = useCallback((next: string, mode: StorageMode) => {
     try {
@@ -146,6 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStorageMode(mode);
     setKind("pat");
     setOauth(null);
+    setFingerprint(tokenFingerprint(next));
     setTokenState(next);
   }, []);
 
@@ -173,6 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStorageMode("local");
       setKind("oauth");
       setOauth(full);
+      setFingerprint(tokenFingerprint(accessToken));
       setTokenState(accessToken);
     },
     [],
@@ -190,6 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTokenState(null);
     setKind(null);
     setOauth(null);
+    setFingerprint("anon");
   }, []);
 
   const refreshOAuth = useCallback(async (): Promise<boolean> => {
