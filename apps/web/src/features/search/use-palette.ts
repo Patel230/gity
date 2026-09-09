@@ -38,7 +38,10 @@ export function usePaletteData(): PaletteData {
       repos: reposQ.data ?? [],
       prs: prsQ.data ?? [],
       issues: issuesQ.data ?? [],
-      orgs: (orgsQ.data ?? []).map((o) => o.login),
+      orgs: [
+        ...(orgsQ.data ?? []).map((o) => o.login),
+        ...(reposQ.data?.map((r) => r.ownerLogin) ?? []),
+      ].filter((login, index, all) => all.indexOf(login) === index),
     }),
     [reposQ.data, prsQ.data, issuesQ.data, orgsQ.data],
   );

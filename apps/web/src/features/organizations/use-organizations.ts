@@ -26,24 +26,32 @@ export function useOrganizations() {
       byOrg.set(r.ownerLogin, arr);
     }
     const base = orgsQ.data ?? [];
-    // Include personal scope as a pseudo-org when the user owns repos.
     const known = new Set(base.map((o) => o.login));
     const extras: GithubOrg[] = [];
-    if (viewer.data?.login && !known.has(viewer.data.login)) {
-      const mine = byOrg.get(viewer.data.login) ?? [];
-      if (mine.length > 0) {
-        extras.push({
-          login: viewer.data.login,
-          name: viewer.data.name ?? viewer.data.login,
-          avatarUrl: viewer.data.avatarUrl,
-          description: "Personal repositories",
-          repoCount: 0,
-          openPrCount: 0,
-          openIssueCount: 0,
-          lastActivityAt: null,
-        });
-      }
+
+    // GitHub's viewer.organizations only contains memberships. Repositories
+    // can also be visible through public access or collaboration, so include
+    // every owner represented in the repository query as an accessible scope.
+    for (const [login, ownerRepos] of byOrg) {
+      if (known.has(login)) continue;
+      const isViewer = login === viewer.data?.login;
+      extras.push({
+        login,
+        name: isViewer ? (viewer.data?.name ?? login) : login,
+        avatarUrl:
+          isViewer
+            ? viewer.data?.avatarUrl ?? ownerRepos[0]?.ownerAvatarUrl ?? ""
+            : ownerRepos[0]?.ownerAvatarUrl ?? "",
+        description: isViewer
+          ? "Personal repositories"
+          : "Repositories accessible to you",
+        repoCount: 0,
+        openPrCount: 0,
+        openIssueCount: 0,
+        lastActivityAt: null,
+      });
     }
+
     return [...base, ...extras].map((o) => {
       const orgRepos = byOrg.get(o.login) ?? [];
       const orgPrs = prs.filter((p) => p.orgLogin === o.login);

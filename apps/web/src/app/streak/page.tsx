@@ -39,7 +39,7 @@ export default function StreakPage() {
         <StatCard label="Active · last 365d" value={s.active365} sub={`${s.totalContributions.toLocaleString()} contributions`} icon={CalendarCheck2} tone="success" />
       </div>
 
-      <Card>
+      <Card accent={20}>
         <CardHeader>
           <CardTitle>Last 30 days</CardTitle>
           <CardDescription>{s.active30} of 30 days active</CardDescription>
@@ -49,7 +49,7 @@ export default function StreakPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card accent={11}>
         <CardHeader>
           <CardTitle>Contributions by day</CardTitle>
           <CardDescription>Last 52 weeks · from GitHub's contribution calendar overlaid with today's live events</CardDescription>

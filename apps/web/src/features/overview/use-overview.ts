@@ -104,8 +104,13 @@ export function useOverview() {
       14,
     );
 
+    const scopeLogins = new Set([
+      ...(orgsQ.data ?? []).map((o) => o.login),
+      ...repos.map((r) => r.ownerLogin),
+    ]);
+
     return {
-      orgCount: orgsQ.data?.length ?? 0,
+      orgCount: scopeLogins.size,
       repoCount: repos.length,
       publicCount: repos.filter((r) => !r.isPrivate).length,
       privateCount: repos.filter((r) => r.isPrivate).length,

@@ -1,10 +1,14 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+export function Card({ className, accent, ...props }: React.HTMLAttributes<HTMLDivElement> & { accent?: number }) {
   return (
     <div
-      className={cn("rounded-lg border border-border bg-card text-card-foreground", className)}
+      data-card-accent={accent}
+      className={cn(
+        "rounded-md border border-border bg-card text-card-foreground transition-colors duration-200 hover:border-[color-mix(in_srgb,var(--card-accent,var(--primary))_55%,var(--border))]",
+        className,
+      )}
       {...props}
     />
   );

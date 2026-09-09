@@ -37,10 +37,10 @@ export default function OrganizationsPage() {
         <EmptyState title="No organizations" hint="Your token can't see any orgs. Personal repos (if any) would appear here too." />
       )}
       <div className="grid gap-2 sm:grid-cols-2">
-        {orgs.map((o) => {
+        {orgs.map((o, index) => {
           const expanded = open === o.login;
           return (
-            <Card key={o.login}>
+            <Card key={o.login} accent={(index % 20) + 1}>
               <CardContent className="pt-3.5">
                 <button
                   className="flex w-full items-center gap-3 text-left"

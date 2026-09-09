@@ -97,10 +97,10 @@ export default function ActivityPage() {
       {rows.length === 0 && (
         <EmptyState title="No activity in range" hint="Try a wider range, or check token permissions for events." />
       )}
-      {groups.map(([day, list]) => (
+      {groups.map(([day, list], index) => (
         <div key={day}>
           <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{day}</p>
-          <Card>
+          <Card accent={(index % 20) + 1}>
             <CardContent className="space-y-0.5 pt-3">
               {list.map((e) => {
                 const meta = KIND_META[e.kind];

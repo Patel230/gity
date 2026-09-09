@@ -89,7 +89,7 @@ export function ConnectionTest() {
   };
 
   return (
-    <Card>
+    <Card accent={17}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Wifi className="size-4" /> Connection test

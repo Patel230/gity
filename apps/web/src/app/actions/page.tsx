@@ -40,7 +40,7 @@ export default function ActionsPage() {
       </div>
 
       {(running.length > 0 || queued.length > 0) && (
-        <Card>
+        <Card accent={18}>
           <CardHeader>
             <CardTitle>Running now</CardTitle>
             <CardDescription>{running.length} in progress · {queued.length} queued</CardDescription>
@@ -53,7 +53,7 @@ export default function ActionsPage() {
         </Card>
       )}
 
-      <Card>
+      <Card accent={19}>
         <CardHeader>
           <CardTitle>Latest run per repository</CardTitle>
           <CardDescription>{latestPerRepo.length} repos with workflow data</CardDescription>

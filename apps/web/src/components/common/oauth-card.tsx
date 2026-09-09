@@ -26,7 +26,7 @@ export function OAuthCard() {
   };
 
   return (
-    <Card>
+    <Card accent={19}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           Connect with GitHub

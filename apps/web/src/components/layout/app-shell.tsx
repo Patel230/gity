@@ -10,6 +10,7 @@ import { useAuth, useViewerUser } from "@/lib/auth";
 import { usePrefs } from "@/lib/preferences";
 import { cn } from "@/lib/utils";
 import { CommandPalette } from "./command-palette";
+import { BrandLogo } from "./brand-logo";
 import { NAV, SETTINGS_NAV } from "./nav";
 import { RateLimitBadge } from "@/components/common/rate-limit";
 import { RefreshControl } from "@/components/common/refresh-control";
@@ -26,7 +27,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-52 shrink-0 flex-col border-r border-border bg-card/40 lg:flex">
+      <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-border/70 bg-card/55 backdrop-blur-xl lg:flex">
         <SidebarBody onNavigate={() => {}} />
       </aside>
       {/* Mobile drawer */}
@@ -40,7 +41,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       )}
       <div className="flex min-w-0 flex-1 flex-col">
         <Header onMenu={() => setSidebarOpen(true)} onLogout={clearToken} />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-4 sm:px-4">{children}</main>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-5 sm:px-5">{children}</main>
         <footer className="border-t border-border px-4 py-2 text-center text-[11px] text-muted-foreground">
           Gity — frontend-only GitHub command center. Data lives on GitHub; your token never
           leaves api.github.com.{" "}
@@ -66,12 +67,7 @@ function SidebarBody({ onNavigate }: { onNavigate: () => void }) {
   const viewer = useViewerUser();
   return (
     <>
-      <div className="flex items-center gap-2 px-4 pb-3 pt-4">
-        <span className="flex size-7 items-center justify-center rounded-md bg-primary font-mono text-sm font-bold text-primary-foreground">
-          G
-        </span>
-        <span className="font-mono text-base font-bold tracking-tight">Gity</span>
-      </div>
+      <div className="px-4 pb-3 pt-4"><BrandLogo /></div>
       <nav className="flex-1 space-y-0.5 overflow-auto px-2">
         {NAV.map((item) => {
           const active =
@@ -82,11 +78,11 @@ function SidebarBody({ onNavigate }: { onNavigate: () => void }) {
               href={item.href}
               onClick={onNavigate}
               className={cn(
-                "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] text-muted-foreground hover:bg-accent hover:text-foreground",
-                active && "bg-accent font-medium text-foreground",
+                "group flex items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-[13px] text-muted-foreground hover:bg-accent/70 hover:text-foreground",
+                active && "mx-1 gap-3.5 rounded-[20px] bg-[color-mix(in_srgb,var(--primary)_15%,transparent)] px-4 py-4 text-[15px] font-medium text-foreground shadow-[inset_5px_0_var(--primary)]",
               )}
             >
-              <item.icon className="size-4 shrink-0" />
+              <item.icon className={cn(active ? "size-5" : "size-4", "shrink-0", active ? "text-[var(--primary)]" : "group-hover:text-[var(--primary)]")} />
               {item.label}
             </Link>
           );
@@ -96,16 +92,17 @@ function SidebarBody({ onNavigate }: { onNavigate: () => void }) {
           href={SETTINGS_NAV.href}
           onClick={onNavigate}
           className={cn(
-            "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] text-muted-foreground hover:bg-accent hover:text-foreground",
-            pathname.startsWith(SETTINGS_NAV.href) && "bg-accent font-medium text-foreground",
+            "group flex items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-[13px] text-muted-foreground hover:bg-accent/70 hover:text-foreground",
+            pathname.startsWith(SETTINGS_NAV.href) && "mx-1 gap-3.5 rounded-[20px] bg-[color-mix(in_srgb,var(--primary)_15%,transparent)] px-4 py-4 text-[15px] font-medium text-foreground shadow-[inset_5px_0_var(--primary)]",
           )}
         >
-          <SETTINGS_NAV.icon className="size-4 shrink-0" />
+          <SETTINGS_NAV.icon className={cn("size-4 shrink-0", pathname.startsWith(SETTINGS_NAV.href) ? "text-[var(--primary)]" : "group-hover:text-[var(--primary)]")} />
           {SETTINGS_NAV.label}
         </Link>
       </nav>
       <div className="border-t border-border p-3">
         <div className="flex items-center gap-2">
+          <Link href="/profile" className="flex min-w-0 flex-1 items-center gap-2 rounded-lg p-1 -m-1 hover:bg-accent/70">
           <Avatar src={viewer.data?.avatarUrl} alt={viewer.data?.login ?? "?"} />
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-medium">{viewer.data?.login ?? "…"}</p>
@@ -113,6 +110,7 @@ function SidebarBody({ onNavigate }: { onNavigate: () => void }) {
               {viewer.data?.name ?? "GitHub user"}
             </p>
           </div>
+          </Link>
           <button
             onClick={clearToken}
             title="Remove token (sign out)"
@@ -127,15 +125,24 @@ function SidebarBody({ onNavigate }: { onNavigate: () => void }) {
 }
 
 function Header({ onMenu, onLogout }: { onMenu: () => void; onLogout: () => void }) {
-  const { theme, setTheme } = usePrefs();
+  const pathname = usePathname();
+  const { appearance, setAppearance } = usePrefs();
   const palette = usePaletteData();
+  const current = [...NAV, SETTINGS_NAV].find((item) =>
+    item.href === "/" ? pathname === "/" : pathname.startsWith(item.href),
+  );
   void onLogout;
   return (
-    <header className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b border-border bg-background/90 px-3 backdrop-blur sm:px-4">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border/70 bg-background/75 px-3 backdrop-blur-xl sm:px-5">
       <Button size="icon" variant="ghost" className="lg:hidden" onClick={onMenu} aria-label="Menu">
         <Menu className="size-4" />
       </Button>
-      <span className="font-mono text-sm font-bold lg:hidden">Gity</span>
+      <BrandLogo className="lg:hidden" markClassName="size-7 rounded-md" />
+      <div className="hidden min-w-0 items-center gap-2 lg:flex">
+        <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">gity</span>
+        <span className="text-border">/</span>
+        <span className="truncate text-xs font-medium text-foreground">{current?.label ?? "Workspace"}</span>
+      </div>
       <div className="flex-1" />
       <CommandPalette data={palette} />
       <RateLimitBadge />
@@ -143,11 +150,11 @@ function Header({ onMenu, onLogout }: { onMenu: () => void; onLogout: () => void
       <Button
         size="icon"
         variant="ghost"
-        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-        title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-        aria-label="Toggle theme"
+        onClick={() => setAppearance(appearance === "dark" ? "light" : "dark")}
+        title={`Switch to ${appearance === "dark" ? "light" : "dark"} mode`}
+        aria-label="Toggle light and dark theme"
       >
-        {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+        {appearance === "dark" ? <Sun className="size-4 text-[var(--primary)]" /> : <Moon className="size-4 text-[var(--primary)]" />}
       </Button>
     </header>
   );

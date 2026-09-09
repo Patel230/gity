@@ -33,11 +33,16 @@ async function s256(verifier: string): Promise<string> {
 }
 
 export async function getClientId(): Promise<string> {
-  const res = await fetch("/api/config");
-  if (!res.ok) throw new Error("Login service is unreachable. Try again or use a token.");
-  const { client_id } = (await res.json()) as { client_id?: string };
+  let res: Response;
+  try {
+    res = await fetch("/api/config", { cache: "no-store" });
+  } catch {
+    throw new Error("GitHub login service could not be reached. Check your connection or use a token.");
+  }
+  if (!res.ok) throw new Error("GitHub login service is unavailable. Try again or use a token.");
+  const { client_id } = (await res.json()) as { client_id?: string | null };
   if (!client_id)
-    throw new Error("Login is not configured yet (missing Client ID). Use a token for now.");
+    throw new Error("GitHub login is not configured on this deployment yet. Use a token for now, or ask the deployer to add the GitHub App credentials.");
   return client_id;
 }
 

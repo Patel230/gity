@@ -44,23 +44,23 @@ export default function OverviewPage() {
 
       {/* Headline stats */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
-        <StatCard label="Organizations" value={s.orgCount} icon={Building2} />
-        <StatCard label="Repositories" value={s.repoCount} sub={`${s.publicCount} public · ${s.privateCount} private · ${s.archivedCount} archived`} icon={Database} />
-        <StatCard label="Open PRs" value={s.openPrs} sub={`${s.draftPrs} drafts`} icon={GitPullRequest} tone="info" />
-        <StatCard label="Merged today" value={s.mergedToday} sub={`${s.mergedWeek} this week`} icon={GitMerge} tone="success" />
-        <StatCard label="Open issues" value={s.openIssues} sub={`${s.issuesClosedToday} closed today`} icon={CircleDot} tone="warning" />
-        <StatCard label="Failing CI" value={num(s.failingCount, ov.ready.ci)} sub={ov.ready.ci ? (s.failingCount ? "needs attention" : "all green") : "checking…"} icon={AlertTriangle} tone={s.failingCount && ov.ready.ci ? "destructive" : "success"} />
-        <StatCard label="Workflows running" value={num(s.runningCount, ov.ready.runs)} icon={Play} tone="info" />
-        <StatCard label="Commits today" value={num(s.commitsToday, ov.ready.events)} icon={GitCommitHorizontal} />
-        <StatCard label="Active repos today" value={num(s.activeToday, ov.ready.events)} icon={Zap} />
+        <StatCard label="Organizations" value={s.orgCount} icon={Building2} accent={1} />
+        <StatCard label="Repositories" value={s.repoCount} sub={`${s.publicCount} public · ${s.privateCount} private · ${s.archivedCount} archived`} icon={Database} accent={2} />
+        <StatCard label="Open PRs" value={s.openPrs} sub={`${s.draftPrs} drafts`} icon={GitPullRequest} tone="info" accent={3} />
+        <StatCard label="Merged today" value={s.mergedToday} sub={`${s.mergedWeek} this week`} icon={GitMerge} tone="success" accent={4} />
+        <StatCard label="Open issues" value={s.openIssues} sub={`${s.issuesClosedToday} closed today`} icon={CircleDot} tone="warning" accent={5} />
+        <StatCard label="Failing CI" value={num(s.failingCount, ov.ready.ci)} sub={ov.ready.ci ? (s.failingCount ? "needs attention" : "all green") : "checking…"} icon={AlertTriangle} tone={s.failingCount && ov.ready.ci ? "destructive" : "success"} accent={6} />
+        <StatCard label="Workflows running" value={num(s.runningCount, ov.ready.runs)} icon={Play} tone="info" accent={7} />
+        <StatCard label="Commits today" value={num(s.commitsToday, ov.ready.events)} icon={GitCommitHorizontal} accent={8} />
+        <StatCard label="Active repos today" value={num(s.activeToday, ov.ready.events)} icon={Zap} accent={9} />
         <Link href="/streak">
-          <StatCard label="Gity streak" value={`${streak.streak.current}d`} sub={streak.streak.todayActive ? `active today (${streak.streak.todayCount})` : "not active yet today"} icon={Flame} tone="warning" />
+          <StatCard label="Gity streak" value={`${streak.streak.current}d`} sub={streak.streak.todayActive ? `active today (${streak.streak.todayCount})` : "not active yet today"} icon={Flame} tone="warning" accent={10} />
         </Link>
       </div>
 
       {/* Charts */}
       <div className="grid gap-2 lg:grid-cols-2">
-        <Card>
+        <Card accent={11}>
           <CardHeader>
             <CardTitle>PR activity</CardTitle>
             <CardDescription>PRs opened per day · last 14 days</CardDescription>
@@ -69,7 +69,7 @@ export default function OverviewPage() {
             <PrActivityChart data={s.prByDay} />
           </CardContent>
         </Card>
-        <Card>
+        <Card accent={12}>
           <CardHeader>
             <CardTitle>Issue activity</CardTitle>
             <CardDescription>Opened vs closed per day · last 14 days</CardDescription>
@@ -82,7 +82,7 @@ export default function OverviewPage() {
 
       <div className="grid gap-2 lg:grid-cols-3">
         {/* Heatmap */}
-        <Card className="lg:col-span-2">
+        <Card accent={13} className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Activity heatmap</CardTitle>
             <CardDescription>Contributions per day · last 26 weeks</CardDescription>
@@ -100,7 +100,7 @@ export default function OverviewPage() {
           </CardContent>
         </Card>
         {/* CI health */}
-        <Card>
+        <Card accent={14}>
           <CardHeader>
             <CardTitle>CI health</CardTitle>
             <CardDescription>Default-branch status · recently pushed repos</CardDescription>
@@ -127,7 +127,7 @@ export default function OverviewPage() {
 
       <div className="grid gap-2 lg:grid-cols-3">
         {/* Most active repos */}
-        <Card>
+        <Card accent={15}>
           <CardHeader>
             <CardTitle>Most active repos</CardTitle>
             <CardDescription>By recent event volume</CardDescription>
@@ -144,7 +144,7 @@ export default function OverviewPage() {
           </CardContent>
         </Card>
         {/* Recent activity */}
-        <Card className="lg:col-span-2">
+        <Card accent={16} className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Recent activity</CardTitle>
             <CardDescription>Latest events across your GitHub</CardDescription>
@@ -175,7 +175,7 @@ export default function OverviewPage() {
         </Card>
       </div>
 
-      <Card>
+      <Card accent={17}>
         <CardHeader>
           <CardTitle>Rate limits</CardTitle>
           <CardDescription>Live budget from GitHub response headers</CardDescription>
@@ -190,10 +190,12 @@ export default function OverviewPage() {
 
 export function PageHead({ title, sub, right }: { title: string; sub?: string; right?: React.ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-3">
-      <div>
-        <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
-        {sub ? <p className="text-xs text-muted-foreground">{sub}</p> : null}
+    <div className="flex items-start justify-between gap-3 border-b border-border/60 pb-3">
+      <div className="relative pl-3">
+        <span className="absolute bottom-0 left-0 top-0 w-0.5 rounded-full bg-primary" />
+        <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--primary)]">gity / {title.toLowerCase()}</p>
+        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+        {sub ? <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p> : null}
       </div>
       {right}
     </div>

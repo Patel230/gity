@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Eye, EyeOff, KeyRound, Loader, ShieldAlert, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, KeyRound, Loader, Moon, ShieldAlert, Sun, Trash2, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,12 +13,12 @@ import { ConnectionTest } from "@/components/common/connection-test";
 import { PageHead } from "@/app/page";
 import { useAuth, useViewerUser, type StorageMode } from "@/lib/auth";
 import { checkToken } from "@/lib/github/rest";
-import { POLL_LABEL, usePrefs, type PollInterval, type Theme } from "@/lib/preferences";
+import { POLL_LABEL, THEMES, usePrefs, type PollInterval, type Theme } from "@/lib/preferences";
 
 export default function SettingsPage() {
   const { token, storageMode, setToken, clearToken } = useAuth();
   const viewer = useViewerUser();
-  const { theme, setTheme, poll, setPoll } = usePrefs();
+  const { theme, setTheme, appearance, setAppearance, poll, setPoll } = usePrefs();
   const [draft, setDraft] = useState("");
   const [mode, setMode] = useState<StorageMode>("local");
   const [show, setShow] = useState(false);
@@ -55,7 +55,7 @@ export default function SettingsPage() {
 
       <OAuthCard />
 
-      <Card>
+      <Card accent={12}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><KeyRound className="size-4" /> GitHub token</CardTitle>
           <CardDescription>
@@ -115,7 +115,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card accent={13}>
         <CardHeader>
           <CardTitle>Live Refresh</CardTitle>
           <CardDescription>Polling — not true real-time. Workflow runs and recent activity poll on this interval; heavier data (repos, PRs, issues, CI) refreshes on page open, window focus, and manual Refresh to protect GitHub rate limits.</CardDescription>
@@ -135,23 +135,29 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card accent={14}>
         <CardHeader>
-          <CardTitle>Appearance</CardTitle>
-          <CardDescription>Dark mode first, light available.</CardDescription>
+          <CardTitle>Theme</CardTitle>
+          <CardDescription>Choose a dark developer palette. Changes apply everywhere instantly.</CardDescription>
         </CardHeader>
         <CardContent>
           <Select value={theme} onValueChange={(v) => setTheme(v as Theme)}>
             <SelectTrigger className="h-8 w-44"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="dark">Dark</SelectItem>
-              <SelectItem value="light">Light</SelectItem>
+              {(Object.keys(THEMES) as Theme[]).map((id) => (
+                <SelectItem key={id} value={id}>{THEMES[id].label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
+          <div className="mt-3 flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Appearance</span>
+            <Button size="sm" variant={appearance === "dark" ? "default" : "outline"} onClick={() => setAppearance("dark")}><Moon className="size-3" /> Dark</Button>
+            <Button size="sm" variant={appearance === "light" ? "default" : "outline"} onClick={() => setAppearance("light")}><Sun className="size-3" /> Light</Button>
+          </div>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card accent={15}>
         <CardHeader>
           <CardTitle>Rate limits</CardTitle>
           <CardDescription>Live budget from GitHub response headers</CardDescription>
@@ -163,7 +169,7 @@ export default function SettingsPage() {
 
       <ConnectionTest />
 
-      <Card>
+      <Card accent={16}>
         <CardHeader>
           <CardTitle>Fine-grained token setup</CardTitle>
           <CardDescription>Minimum read permissions for full Gity functionality</CardDescription>

@@ -13,7 +13,7 @@ export function EmptyState({
   hint?: string;
 }) {
   return (
-    <Card className="flex flex-col items-center gap-2 px-6 py-10 text-center">
+    <Card accent={3} className="flex flex-col items-center gap-2 px-6 py-10 text-center">
       <Inbox className="size-7 text-muted-foreground" />
       <p className="text-sm font-medium">{title}</p>
       {hint ? <p className="max-w-sm text-xs text-muted-foreground">{hint}</p> : null}
@@ -84,7 +84,7 @@ export function ErrorState({
   }
 
   return (
-    <Card className="flex flex-col items-center gap-2 border-[color-mix(in_srgb,var(--destructive)_40%,var(--border))] px-6 py-10 text-center">
+    <Card accent={3} className="flex flex-col items-center gap-2 border-[color-mix(in_srgb,var(--destructive)_40%,var(--border))] px-6 py-10 text-center">
       <AlertTriangle className="size-7 text-[var(--destructive)]" />
       <p className="text-sm font-medium">{title}</p>
       <p className="max-w-md text-xs text-muted-foreground">{hint}</p>

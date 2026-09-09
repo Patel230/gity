@@ -19,7 +19,7 @@ export function RateLimitBadge() {
         ? "text-[var(--destructive)]"
         : share < 0.3
           ? "text-[var(--warning)]"
-          : "text-muted-foreground";
+          : "text-[var(--primary)]";
   const title = [
     `REST: ${fmt(snap.rest?.remaining ?? null)}/${fmt(snap.rest?.limit ?? null)}`,
     `Search: ${fmt(snap.search?.remaining ?? null)}/${fmt(snap.search?.limit ?? null)}`,

@@ -35,20 +35,20 @@ export function RefreshControl({ lastUpdatedAt }: { lastUpdatedAt?: number }) {
     ageS < 5 ? "just now" : ageS < 60 ? `${ageS}s ago` : `${Math.floor(ageS / 60)}m ago`;
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5">
       <span
         title={refreshInterval === false ? "Live Refresh is off" : `Live Refresh: ${POLL_LABEL[poll]} (polling — not true real-time)`}
-        className="hidden items-center gap-1.5 rounded-full border border-border px-2 py-1 text-[11px] text-muted-foreground sm:inline-flex"
+        className="hidden items-center gap-1 rounded-full border border-[color-mix(in_srgb,var(--primary)_45%,var(--border))] bg-[color-mix(in_srgb,var(--primary)_8%,transparent)] px-2 py-1 text-[10px] font-medium text-[var(--primary)] sm:inline-flex"
       >
         <span className="relative flex size-1.5">
           {refreshInterval !== false && (
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--success)] opacity-60" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--primary)] opacity-50" />
           )}
           <span
             className={
               refreshInterval === false
                 ? "relative inline-flex size-1.5 rounded-full bg-muted-foreground"
-                : "relative inline-flex size-1.5 rounded-full bg-[var(--success)]"
+                : "relative inline-flex size-1.5 rounded-full bg-[var(--primary)]"
             }
           />
         </span>
@@ -59,7 +59,7 @@ export function RefreshControl({ lastUpdatedAt }: { lastUpdatedAt?: number }) {
         )}
         {refreshInterval === false ? "Paused" : POLL_LABEL[poll]}
       </span>
-      <span className="hidden text-[11px] text-muted-foreground md:inline" title="Age of the freshest visible data">
+      <span aria-live="polite" className="hidden text-[10px] text-muted-foreground md:inline" title="Age of the freshest visible data">
         {fetching > 0 ? "Updating…" : `Updated ${age}`}
       </span>
       <Button
@@ -73,6 +73,7 @@ export function RefreshControl({ lastUpdatedAt }: { lastUpdatedAt?: number }) {
         }}
         disabled={fetching > 0}
         title="Refetch all GitHub data now (full re-sync)"
+        aria-label={fetching > 0 ? "Refreshing GitHub data" : "Refresh all GitHub data"}
       >
         <RefreshCw className={fetching > 0 ? "size-3.5 animate-spin" : "size-3.5"} />
         Refresh
