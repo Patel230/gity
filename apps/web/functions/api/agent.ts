@@ -16,6 +16,7 @@ interface Env {
 
 const GITHUB_API = "https://api.github.com";
 const MAX_PAGE_SIZE = 100;
+const MAX_REQUEST_BYTES = 32_768;
 
 type JsonRpcRequest = {
   jsonrpc?: string;
@@ -123,10 +124,10 @@ function json(data: unknown, status = 200, env?: Env): Response {
   return new Response(JSON.stringify(data), { status, headers: headers(env?.GITY_AGENT_ORIGIN) });
 }
 
-function error(id: JsonRpcRequest["id"], code: number, message: string): Response {
+function error(id: JsonRpcRequest["id"], code: number, message: string, env?: Env): Response {
   return new Response(
     JSON.stringify({ jsonrpc: "2.0", id: id ?? null, error: { code, message } }),
-    { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } },
+    { status: 200, headers: headers(env?.GITY_AGENT_ORIGIN) },
   );
 }
 
@@ -254,26 +255,28 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, env);
 
   let body: JsonRpcRequest;
+  const contentLength = Number(request.headers.get("content-length") ?? "0");
+  if (contentLength > MAX_REQUEST_BYTES) return error(null, -32600, "Request is too large.", env);
   try {
     body = (await request.json()) as JsonRpcRequest;
   } catch {
-    return error(null, -32700, "Invalid JSON.");
+    return error(null, -32700, "Invalid JSON.", env);
   }
-  if (body.jsonrpc !== "2.0" || typeof body.method !== "string") return error(body.id, -32600, "Invalid JSON-RPC request.");
+  if (body.jsonrpc !== "2.0" || typeof body.method !== "string") return error(body.id, -32600, "Invalid JSON-RPC request.", env);
   if (body.method === "initialize") return new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id ?? null, result: { protocolVersion: "2025-06-18", serverInfo: { name: "gity", version: "1" }, capabilities: { tools: {} } } }), { headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
   if (body.method === "tools/list") return new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id ?? null, result: { tools: TOOLS } }), { headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
-  if (body.method !== "tools/call") return error(body.id, -32601, "Method not found.");
+  if (body.method !== "tools/call") return error(body.id, -32601, "Method not found.", env);
 
   const params = body.params ?? {};
   const name = params.name;
   const args = params.arguments;
-  if (typeof name !== "string" || !TOOLS.some((tool) => tool.name === name) || (args !== undefined && (typeof args !== "object" || args === null || Array.isArray(args)))) return error(body.id, -32602, "Invalid tool arguments.");
+  if (typeof name !== "string" || !TOOLS.some((tool) => tool.name === name) || (args !== undefined && (typeof args !== "object" || args === null || Array.isArray(args)))) return error(body.id, -32602, "Invalid tool arguments.", env);
   try {
     const token = await createInstallationToken(env);
     const result = await callTool(name, (args ?? {}) as Record<string, unknown>, token);
     return new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id ?? null, result: { content: [{ type: "text", text: JSON.stringify(result) }] } }), { headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : "Agent tool failed.";
-    return error(body.id, -32000, message);
+    return error(body.id, -32000, message, env);
   }
 }
