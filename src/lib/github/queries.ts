@@ -54,9 +54,12 @@ export const qk = {
   orgs: (fp: string) => ["gity", fp, "orgs"] as const,
   repos: (fp: string) => ["gity", fp, "repos"] as const,
   ciStates: (fp: string) => ["gity", fp, "ci-states"] as const,
-  openPrs: (fp: string) => ["gity", fp, "prs", "open"] as const,
-  mergedPrs: (fp: string) => ["gity", fp, "prs", "merged"] as const,
-  allIssues: (fp: string) => ["gity", fp, "issues", "all"] as const,
+  // PR/issue/event keys include the login + repo signature so the first fetch
+  // happens only when dependencies arrive (no stale empty cache), and refires
+  // exactly once when they do.
+  openPrs: (fp: string, login = "", sig = "") => ["gity", fp, "prs", "open", login, sig] as const,
+  mergedPrs: (fp: string, login = "") => ["gity", fp, "prs", "merged", login] as const,
+  allIssues: (fp: string, login = "", sig = "") => ["gity", fp, "issues", "all", login, sig] as const,
   workflowRuns: (fp: string) => ["gity", fp, "actions", "runs"] as const,
   events: (fp: string, login: string) => ["gity", fp, "events", login] as const,
   contributions: (fp: string, login: string) =>
@@ -109,12 +112,11 @@ export function ciStatesOptions(
   token: string | null,
   fp: string,
   repos: GithubRepo[] | undefined,
-  limit = 20,
 ) {
   const targets = (repos ?? [])
     .filter((r) => !r.isArchived)
     .sort((a, b) => (b.pushedAt ?? "").localeCompare(a.pushedAt ?? ""))
-    .slice(0, limit);
+    .slice(0, 12);
   const ids = targets.map((r) => r.fullName).join(",");
   return queryOptions<Record<string, GithubRepo["ciState"]>, GithubApiError>({
     queryKey: [...qk.ciStates(fp), ids],
@@ -122,7 +124,7 @@ export function ciStatesOptions(
       const out: Record<string, GithubRepo["ciState"]> = {};
       // Small concurrency to stay friendly to rate limits.
       const queue = [...targets];
-      const workers = Array.from({ length: 4 }, async () => {
+      const workers = Array.from({ length: 6 }, async () => {
         while (queue.length) {
           const repo = queue.shift()!;
           const [owner, name] = repo.fullName.split("/");
@@ -146,8 +148,13 @@ export function openPrsOptions(
   login: string | undefined,
   repos: GithubRepo[] | undefined,
 ) {
+  const top = (repos ?? [])
+    .filter((r) => r.openPrCount > 0 && !r.isArchived)
+    .sort((a, b) => b.openPrCount - a.openPrCount)
+    .slice(0, 12);
+  const sig = top.map((r) => r.fullName).join(",");
   return queryOptions<GithubPullRequest[], GithubApiError>({
-    queryKey: qk.openPrs(fp),
+    queryKey: qk.openPrs(fp, login ?? "", sig),
     queryFn: async () => {
       const byKey = new Map<string, GithubPullRequest>();
       // 1) Everything involving the viewer (authored/assigned/mentioned).
@@ -156,7 +163,7 @@ export function openPrsOptions(
           const { prs } = await fetchSearchPrsAndIssues(
             token!,
             `involves:${login} sort:updated-desc`,
-            { maxPages: 5 },
+            { maxPages: 3 },
           );
           for (const pr of prs.filter(
             (p) => p.state === "open" || p.state === "draft",
@@ -167,12 +174,8 @@ export function openPrsOptions(
         }
       }
       // 2) Detailed open PRs (with review decisions) for the most active repos.
-      const top = (repos ?? [])
-        .filter((r) => r.openPrCount > 0 && !r.isArchived)
-        .sort((a, b) => b.openPrCount - a.openPrCount)
-        .slice(0, 15);
       const queue = [...top];
-      const workers = Array.from({ length: 3 }, async () => {
+      const workers = Array.from({ length: 5 }, async () => {
         while (queue.length) {
           const repo = queue.shift()!;
           const [owner, name] = repo.fullName.split("/");
@@ -183,7 +186,7 @@ export function openPrsOptions(
       await Promise.all(workers);
       // 3) REST fallback if both came up empty but repos report open PRs.
       if (byKey.size === 0 && login) {
-        const prs = await searchPrsRest(token!, `involves:${login}`, { maxPages: 5 });
+        const prs = await searchPrsRest(token!, `involves:${login}`, { maxPages: 3 });
         for (const pr of prs.filter(
           (p) => p.state === "open" || p.state === "draft",
         ))
@@ -193,7 +196,7 @@ export function openPrsOptions(
         b.updatedAt.localeCompare(a.updatedAt),
       );
     },
-    enabled: !!token,
+    enabled: !!token && !!login,
     staleTime: 60_000,
     gcTime: 10 * 60_000,
     retry: (count, err) =>
@@ -208,18 +211,18 @@ export function mergedPrsOptions(
   login: string | undefined,
 ) {
   return queryOptions<GithubPullRequest[], GithubApiError>({
-    queryKey: qk.mergedPrs(fp),
+    queryKey: qk.mergedPrs(fp, login ?? ""),
     queryFn: async () => {
       if (!login) return [];
       try {
         const { prs } = await fetchSearchPrsAndIssues(
           token!,
           `involves:${login} sort:updated-desc`,
-          { maxPages: 5 },
+          { maxPages: 3 },
         );
         return prs.filter((p) => p.state === "merged" || p.state === "closed");
       } catch {
-        const prs = await searchPrsRest(token!, `involves:${login}`, { maxPages: 5 });
+        const prs = await searchPrsRest(token!, `involves:${login}`, { maxPages: 3 });
         return prs.filter((p) => p.state === "merged" || p.state === "closed");
       }
     },
@@ -238,18 +241,18 @@ export function allIssuesOptions(
   login: string | undefined,
 ) {
   return queryOptions<GithubIssue[], GithubApiError>({
-    queryKey: qk.allIssues(fp),
+    queryKey: qk.allIssues(fp, login ?? ""),
     queryFn: async () => {
       if (!login) return [];
       try {
         const { issues } = await fetchSearchPrsAndIssues(
           token!,
           `involves:${login} sort:updated-desc`,
-          { maxPages: 5 },
+          { maxPages: 3 },
         );
         return issues;
       } catch {
-        return searchIssuesRest(token!, `involves:${login}`, { maxPages: 5 });
+        return searchIssuesRest(token!, `involves:${login}`, { maxPages: 3 });
       }
     },
     enabled: !!token && !!login,
@@ -265,7 +268,7 @@ export function workflowRunsOptions(
   token: string | null,
   fp: string,
   repos: GithubRepo[] | undefined,
-  limit = 25,
+  limit = 20,
 ) {
   const targets = (repos ?? [])
     .filter((r) => !r.isArchived)
@@ -277,7 +280,7 @@ export function workflowRunsOptions(
     queryFn: async () => {
       const out: GithubWorkflowRun[] = [];
       const queue = [...targets];
-      const workers = Array.from({ length: 4 }, async () => {
+      const workers = Array.from({ length: 6 }, async () => {
         while (queue.length) {
           const repo = queue.shift()!;
           // Latest run per repo keeps this to 1 REST call per repo.

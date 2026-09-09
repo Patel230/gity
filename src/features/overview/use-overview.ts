@@ -134,6 +134,16 @@ export function useOverview() {
   const error =
     reposQ.error ?? orgsQ.error ?? openPrsQ.error ?? mergedPrsQ.error ?? issuesQ.error;
 
+  // Progressive readiness — the page renders each section as its data lands
+  // instead of gating everything on the slowest query.
+  const ready = {
+    core: !reposQ.isLoading && !orgsQ.isLoading && !openPrsQ.isLoading && !issuesQ.isLoading,
+    runs: !runsQ.isLoading,
+    events: !eventsQ.isLoading,
+    ci: !ciQ.isLoading,
+    contrib: !contribQ.isLoading,
+  };
+
   const dataUpdatedAt = Math.max(
     reposQ.dataUpdatedAt,
     openPrsQ.dataUpdatedAt,
@@ -150,6 +160,7 @@ export function useOverview() {
     openPrs: openPrsQ.data ?? [],
     contributions: contribQ.data ?? [],
     isLoading,
+    ready,
     error: error as Error | null,
     dataUpdatedAt,
     refetch: () => {

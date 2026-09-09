@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CiDot } from "@/components/common/ci-dot";
 import { EmptyState, ErrorState } from "@/components/common/error-state";
@@ -30,10 +31,13 @@ export default function OverviewPage() {
   const ov = useOverview();
   const streak = useStreak();
 
-  if (ov.isLoading) return <OverviewLoading />;
-  if (ov.error) return <ErrorState error={ov.error} onRetry={ov.refetch} />;
+  // Core failure (repos/orgs/PRs/issues) blocks the whole page; everything
+  // else degrades to per-section skeletons via `ready` flags.
+  if (!ov.ready.core && ov.error) return <ErrorState error={ov.error} onRetry={ov.refetch} />;
+  if (!ov.ready.core) return <OverviewLoading />;
 
   const s = ov.stats;
+  const num = (v: number, ok: boolean): string | number => (ok ? v : "…");
   return (
     <div className="space-y-4">
       <PageHead title="Overview" sub="Everything happening across your GitHub, right now." />
@@ -45,10 +49,10 @@ export default function OverviewPage() {
         <StatCard label="Open PRs" value={s.openPrs} sub={`${s.draftPrs} drafts`} icon={GitPullRequest} tone="info" />
         <StatCard label="Merged today" value={s.mergedToday} sub={`${s.mergedWeek} this week`} icon={GitMerge} tone="success" />
         <StatCard label="Open issues" value={s.openIssues} sub={`${s.issuesClosedToday} closed today`} icon={CircleDot} tone="warning" />
-        <StatCard label="Failing CI" value={s.failingCount} sub={s.failingCount ? "needs attention" : "all green"} icon={AlertTriangle} tone={s.failingCount ? "destructive" : "success"} />
-        <StatCard label="Workflows running" value={s.runningCount} icon={Play} tone="info" />
-        <StatCard label="Commits today" value={s.commitsToday} icon={GitCommitHorizontal} />
-        <StatCard label="Active repos today" value={s.activeToday} icon={Zap} />
+        <StatCard label="Failing CI" value={num(s.failingCount, ov.ready.ci)} sub={ov.ready.ci ? (s.failingCount ? "needs attention" : "all green") : "checking…"} icon={AlertTriangle} tone={s.failingCount && ov.ready.ci ? "destructive" : "success"} />
+        <StatCard label="Workflows running" value={num(s.runningCount, ov.ready.runs)} icon={Play} tone="info" />
+        <StatCard label="Commits today" value={num(s.commitsToday, ov.ready.events)} icon={GitCommitHorizontal} />
+        <StatCard label="Active repos today" value={num(s.activeToday, ov.ready.events)} icon={Zap} />
         <Link href="/streak">
           <StatCard label="Gity streak" value={`${streak.streak.current}d`} sub={streak.streak.todayActive ? `active today (${streak.streak.todayCount})` : "not active yet today"} icon={Flame} tone="warning" />
         </Link>
@@ -84,10 +88,14 @@ export default function OverviewPage() {
             <CardDescription>Contributions per day · last 26 weeks</CardDescription>
           </CardHeader>
           <CardContent>
-            {ov.contributions.length ? (
-              <Heatmap days={ov.contributions} weeks={26} />
+            {ov.ready.contrib ? (
+              ov.contributions.length ? (
+                <Heatmap days={ov.contributions} weeks={26} />
+              ) : (
+                <EmptyState title="No contribution data" hint="The contributions endpoint may be blocked for this token." />
+              )
             ) : (
-              <EmptyState title="No contribution data" hint="The contributions endpoint may be blocked for this token." />
+              <Skeleton className="h-28 w-full" />
             )}
           </CardContent>
         </Card>
@@ -98,7 +106,9 @@ export default function OverviewPage() {
             <CardDescription>Default-branch status · recently pushed repos</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            {s.failingRepos.length === 0 ? (
+            {!ov.ready.ci ? (
+              <Skeleton className="h-24 w-full" />
+            ) : s.failingRepos.length === 0 ? (
               <EmptyState title="No failing repos" hint="Checked the most recently pushed repos." />
             ) : (
               s.failingRepos.slice(0, 6).map((r) => (
@@ -140,6 +150,10 @@ export default function OverviewPage() {
             <CardDescription>Latest events across your GitHub</CardDescription>
           </CardHeader>
           <CardContent className="space-y-1">
+            {!ov.ready.events ? (
+              <Skeleton className="h-40 w-full" />
+            ) : (
+              <>
             {ov.events.length === 0 && <EmptyState title="No recent events" />}
             {ov.events.slice(0, 10).map((e) => (
               <a key={e.id} href={e.htmlUrl} target="_blank" rel="noopener" className="flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-accent">
@@ -155,6 +169,8 @@ export default function OverviewPage() {
             <Link href="/activity" className="block pt-1 text-xs text-[var(--primary)] hover:underline">
               Full activity feed →
             </Link>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

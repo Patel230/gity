@@ -495,7 +495,7 @@ export async function fetchRepoOpenPrs(
           }
         );
       },
-      { maxPages: 5 },
+      { maxPages: 2 },
     );
     return nodes.map((n) => ({
       id: n.id,
