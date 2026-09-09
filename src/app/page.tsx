@@ -1,69 +1,198 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import Link from "next/link";
+import {
+  AlertTriangle,
+  Building2,
+  CircleDot,
+  Database,
+  Flame,
+  GitCommitHorizontal,
+  GitMerge,
+  GitPullRequest,
+  Play,
+  Zap,
+} from "lucide-react";
+import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CiDot } from "@/components/common/ci-dot";
+import { EmptyState, ErrorState } from "@/components/common/error-state";
+import { Heatmap } from "@/components/common/heatmap";
+import { RateLimitPanel } from "@/components/common/rate-limit";
+import { StatCard, StatCardLoading } from "@/components/common/stat-card";
+import { useOverview } from "@/features/overview/use-overview";
+import { IssueActivityChart, PrActivityChart } from "@/features/overview/charts";
+import { useStreak } from "@/features/streak/use-streak";
+import { timeAgo } from "@/lib/utils";
+
+export default function OverviewPage() {
+  const ov = useOverview();
+  const streak = useStreak();
+
+  if (ov.isLoading) return <OverviewLoading />;
+  if (ov.error) return <ErrorState error={ov.error} onRetry={ov.refetch} />;
+
+  const s = ov.stats;
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className="space-y-4">
+      <PageHead title="Overview" sub="Everything happening across your GitHub, right now." />
+
+      {/* Headline stats */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+        <StatCard label="Organizations" value={s.orgCount} icon={Building2} />
+        <StatCard label="Repositories" value={s.repoCount} sub={`${s.publicCount} public · ${s.privateCount} private · ${s.archivedCount} archived`} icon={Database} />
+        <StatCard label="Open PRs" value={s.openPrs} sub={`${s.draftPrs} drafts`} icon={GitPullRequest} tone="info" />
+        <StatCard label="Merged today" value={s.mergedToday} sub={`${s.mergedWeek} this week`} icon={GitMerge} tone="success" />
+        <StatCard label="Open issues" value={s.openIssues} sub={`${s.issuesClosedToday} closed today`} icon={CircleDot} tone="warning" />
+        <StatCard label="Failing CI" value={s.failingCount} sub={s.failingCount ? "needs attention" : "all green"} icon={AlertTriangle} tone={s.failingCount ? "destructive" : "success"} />
+        <StatCard label="Workflows running" value={s.runningCount} icon={Play} tone="info" />
+        <StatCard label="Commits today" value={s.commitsToday} icon={GitCommitHorizontal} />
+        <StatCard label="Active repos today" value={s.activeToday} icon={Zap} />
+        <Link href="/streak">
+          <StatCard label="Gity streak" value={`${streak.streak.current}d`} sub={streak.streak.todayActive ? `active today (${streak.streak.todayCount})` : "not active yet today"} icon={Flame} tone="warning" />
+        </Link>
+      </div>
+
+      {/* Charts */}
+      <div className="grid gap-2 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>PR activity</CardTitle>
+            <CardDescription>PRs opened per day · last 14 days</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PrActivityChart data={s.prByDay} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Issue activity</CardTitle>
+            <CardDescription>Opened vs closed per day · last 14 days</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <IssueActivityChart opened={s.issuesOpenedByDay} closed={s.issuesClosedByDay} />
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-2 lg:grid-cols-3">
+        {/* Heatmap */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Activity heatmap</CardTitle>
+            <CardDescription>Contributions per day · last 26 weeks</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {ov.contributions.length ? (
+              <Heatmap days={ov.contributions} weeks={26} />
+            ) : (
+              <EmptyState title="No contribution data" hint="The contributions endpoint may be blocked for this token." />
+            )}
+          </CardContent>
+        </Card>
+        {/* CI health */}
+        <Card>
+          <CardHeader>
+            <CardTitle>CI health</CardTitle>
+            <CardDescription>Default-branch status · recently pushed repos</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {s.failingRepos.length === 0 ? (
+              <EmptyState title="No failing repos" hint="Checked the most recently pushed repos." />
+            ) : (
+              s.failingRepos.slice(0, 6).map((r) => (
+                <a key={r.fullName} href={r.htmlUrl} target="_blank" rel="noopener" className="flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-accent">
+                  <CiDot state={r.ciState} />
+                  <span className="truncate font-mono">{r.fullName}</span>
+                </a>
+              ))
+            )}
+            <Link href="/actions" className="block pt-1 text-xs text-[var(--primary)] hover:underline">
+              View all workflows →
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-2 lg:grid-cols-3">
+        {/* Most active repos */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Most active repos</CardTitle>
+            <CardDescription>By recent event volume</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            {s.mostActive.length === 0 && <EmptyState title="No recent activity" />}
+            {s.mostActive.map((a) => (
+              <a key={a.fullName} href={a.repo?.htmlUrl ?? `https://github.com/${a.fullName}`} target="_blank" rel="noopener" className="flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-accent">
+                <Avatar src={a.repo?.ownerAvatarUrl} alt={a.fullName} className="size-5" />
+                <span className="min-w-0 flex-1 truncate font-mono">{a.fullName}</span>
+                <Badge variant="default">{a.count}</Badge>
+              </a>
+            ))}
+          </CardContent>
+        </Card>
+        {/* Recent activity */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Recent activity</CardTitle>
+            <CardDescription>Latest events across your GitHub</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            {ov.events.length === 0 && <EmptyState title="No recent events" />}
+            {ov.events.slice(0, 10).map((e) => (
+              <a key={e.id} href={e.htmlUrl} target="_blank" rel="noopener" className="flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-accent">
+                <Avatar src={e.actorAvatarUrl} alt={e.actorLogin} className="size-5" />
+                <span className="min-w-0 flex-1 truncate">
+                  <span className="font-medium">{e.actorLogin}</span>{" "}
+                  <span className="text-muted-foreground">{e.title}</span>
+                </span>
+                <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{e.repoFullName}</span>
+                <span className="hidden w-16 shrink-0 text-right text-[11px] text-muted-foreground sm:inline">{timeAgo(e.createdAt)}</span>
+              </a>
+            ))}
+            <Link href="/activity" className="block pt-1 text-xs text-[var(--primary)] hover:underline">
+              Full activity feed →
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Rate limits</CardTitle>
+          <CardDescription>Live budget from GitHub response headers</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RateLimitPanel />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+export function PageHead({ title, sub, right }: { title: string; sub?: string; right?: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+        {sub ? <p className="text-xs text-muted-foreground">{sub}</p> : null}
+      </div>
+      {right}
+    </div>
+  );
+}
+
+function OverviewLoading() {
+  return (
+    <div className="space-y-4">
+      <PageHead title="Overview" sub="Loading your GitHub…" />
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+        {Array.from({ length: 10 }).map((_, i) => (
+          <StatCardLoading key={i} />
+        ))}
+      </div>
     </div>
   );
 }

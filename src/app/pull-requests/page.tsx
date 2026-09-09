@@ -1,0 +1,191 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { ExternalLink } from "lucide-react";
+import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TD, TH, THead, TR, Table } from "@/components/ui/table";
+import { EmptyState, ErrorState } from "@/components/common/error-state";
+import { PageHead } from "@/app/page";
+import { usePullRequests } from "@/features/pull-requests/use-prs-issues";
+import type { GithubPullRequest } from "@/lib/github/types";
+import { ageInDays, timeAgo } from "@/lib/utils";
+
+type Tab = "open" | "draft" | "review" | "approved" | "merged" | "closed" | "stale" | "all";
+
+export default function PullRequestsPage() {
+  const { prs, repos, isLoading, error } = usePullRequests();
+  const [tab, setTab] = useState<Tab>("open");
+  const [org, setOrg] = useState("all");
+  const [repo, setRepo] = useState("all");
+  const [author, setAuthor] = useState("all");
+  const [q, setQ] = useState("");
+
+  const orgs = useMemo(() => [...new Set(prs.map((p) => p.orgLogin))].sort(), [prs]);
+  const repoNames = useMemo(
+    () => [...new Set(prs.filter((p) => org === "all" || p.orgLogin === org).map((p) => p.repoFullName))].sort(),
+    [prs, org],
+  );
+  const authors = useMemo(() => [...new Set(prs.map((p) => p.authorLogin))].sort(), [prs]);
+
+  const rows = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return prs.filter((p) => {
+      if (tab === "open" && !(p.state === "open" || p.state === "draft")) return false;
+      if (tab === "draft" && p.state !== "draft") return false;
+      if (tab === "review" && !(p.reviewRequested || p.reviewState === "review_required")) return false;
+      if (tab === "approved" && p.reviewState !== "approved") return false;
+      if (tab === "merged" && p.state !== "merged") return false;
+      if (tab === "closed" && p.state !== "closed") return false;
+      if (tab === "stale" && !(ageInDays(p.updatedAt) >= 30 && (p.state === "open" || p.state === "draft"))) return false;
+      if (org !== "all" && p.orgLogin !== org) return false;
+      if (repo !== "all" && p.repoFullName !== repo) return false;
+      if (author !== "all" && p.authorLogin !== author) return false;
+      if (needle && !`${p.title} #${p.number} ${p.repoFullName}`.toLowerCase().includes(needle)) return false;
+      return true;
+    });
+  }, [prs, tab, org, repo, author, q]);
+
+  const counts = useMemo(() => countBy(prs), [prs]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <PageHead title="Pull requests" sub="Loading…" />
+        <Skeleton className="h-8 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+  if (error) return <ErrorState error={error} />;
+
+  return (
+    <div className="space-y-3">
+      <PageHead title="Pull requests" sub={`${rows.length} of ${prs.length} PRs · click to open on GitHub`} />
+      <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
+        <TabsList className="flex-wrap">
+          {(Object.keys(counts) as Tab[]).map((t) => (
+            <TabsTrigger key={t} value={t} className="capitalize">
+              {t} · {counts[t]}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+      <div className="flex flex-wrap items-center gap-2">
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search PRs…" className="w-44" />
+        <Filter value={org} onChange={(v) => { setOrg(v); setRepo("all"); }} options={["all", ...orgs]} label="org" />
+        <Filter value={repo} onChange={setRepo} options={["all", ...repoNames]} label="repo" wide />
+        <Filter value={author} onChange={setAuthor} options={["all", ...authors]} label="author" />
+      </div>
+      {rows.length === 0 ? (
+        <EmptyState title="No pull requests" hint="Nothing matches this filter set. PR coverage comes from repos you can access." />
+      ) : (
+        <Table>
+          <THead>
+            <TR>
+              <TH>PR</TH>
+              <TH>Repository</TH>
+              <TH>Author</TH>
+              <TH>State</TH>
+              <TH>Review</TH>
+              <TH className="text-right">Age</TH>
+              <TH className="text-right">Updated</TH>
+            </TR>
+          </THead>
+          <tbody>
+            {rows.map((p) => (
+              <TR key={p.id}>
+                <TD>
+                  <a href={p.htmlUrl} target="_blank" rel="noopener" className="group text-xs font-medium hover:text-[var(--primary)] hover:underline">
+                    <span className="mr-1.5 font-mono text-muted-foreground">#{p.number}</span>
+                    {p.title}
+                    <ExternalLink className="ml-1 inline size-3 opacity-0 group-hover:opacity-100" />
+                  </a>
+                  {(p.additions > 0 || p.deletions > 0) && (
+                    <p className="font-mono text-[11px] text-muted-foreground">
+                      <span className="text-[var(--success)]">+{p.additions}</span>{" "}
+                      <span className="text-[var(--destructive)]">−{p.deletions}</span>
+                      {" · "}{p.changedFiles} files
+                    </p>
+                  )}
+                </TD>
+                <TD className="whitespace-nowrap font-mono text-xs">{p.repoFullName}</TD>
+                <TD>
+                  <span className="inline-flex items-center gap-1.5 text-xs">
+                    <Avatar src={p.authorAvatarUrl} alt={p.authorLogin} className="size-4" />
+                    {p.authorLogin}
+                  </span>
+                </TD>
+                <TD><StateBadge state={p.state} /></TD>
+                <TD><ReviewBadge p={p} /></TD>
+                <TD className="whitespace-nowrap text-right text-xs text-muted-foreground">{Math.floor(ageInDays(p.createdAt))}d</TD>
+                <TD className="whitespace-nowrap text-right text-xs text-muted-foreground">{timeAgo(p.updatedAt)}</TD>
+              </TR>
+            ))}
+          </tbody>
+        </Table>
+      )}
+      {repos.length === 0 && null}
+    </div>
+  );
+}
+
+function countBy(prs: GithubPullRequest[]): Record<Tab, number> {
+  const open = prs.filter((p) => p.state === "open" || p.state === "draft");
+  return {
+    open: open.length,
+    draft: prs.filter((p) => p.state === "draft").length,
+    review: prs.filter((p) => p.reviewRequested || p.reviewState === "review_required").length,
+    approved: prs.filter((p) => p.reviewState === "approved").length,
+    merged: prs.filter((p) => p.state === "merged").length,
+    closed: prs.filter((p) => p.state === "closed").length,
+    stale: open.filter((p) => ageInDays(p.updatedAt) >= 30).length,
+    all: prs.length,
+  };
+}
+
+export function StateBadge({ state }: { state: GithubPullRequest["state"] }) {
+  const map = {
+    open: <Badge variant="success">open</Badge>,
+    draft: <Badge variant="outline">draft</Badge>,
+    merged: <Badge variant="info">merged</Badge>,
+    closed: <Badge variant="destructive">closed</Badge>,
+  };
+  return map[state];
+}
+
+export function ReviewBadge({ p }: { p: GithubPullRequest }) {
+  switch (p.reviewState) {
+    case "approved":
+      return <Badge variant="success">approved</Badge>;
+    case "changes_requested":
+      return <Badge variant="destructive">changes requested</Badge>;
+    case "review_required":
+      return <Badge variant="warning">review requested</Badge>;
+    case "commented":
+      return <Badge variant="default">commented</Badge>;
+    default:
+      return <span className="text-xs text-muted-foreground">—</span>;
+  }
+}
+
+function Filter({ value, onChange, options, label, wide }: { value: string; onChange: (v: string) => void; options: string[]; label: string; wide?: boolean }) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className={`h-8 ${wide ? "w-52" : "w-auto min-w-24"}`} title={label}>
+        <SelectValue placeholder={label} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((o) => (
+          <SelectItem key={o} value={o}>
+            {o === "all" ? `All ${label}s` : o}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}

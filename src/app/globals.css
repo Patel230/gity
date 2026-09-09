@@ -1,26 +1,107 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Dark mode first — Gity is a dark-first developer dashboard. */
+:root,
+.dark {
+  --background: #0a0c10;
+  --foreground: #e6e9ee;
+  --card: #11141a;
+  --card-foreground: #e6e9ee;
+  --popover: #161a22;
+  --popover-foreground: #e6e9ee;
+  --primary: #4f7cff;
+  --primary-foreground: #ffffff;
+  --secondary: #1c2230;
+  --secondary-foreground: #c9d1dd;
+  --muted: #1a1f2a;
+  --muted-foreground: #8b94a3;
+  --accent: #1c2230;
+  --accent-foreground: #e6e9ee;
+  --destructive: #f04848;
+  --destructive-foreground: #ffffff;
+  --border: #232a38;
+  --input: #232a38;
+  --ring: #4f7cff;
+  --success: #3fb950;
+  --warning: #d29922;
+}
+
+.light {
+  --background: #f6f8fa;
+  --foreground: #0a0c10;
+  --card: #ffffff;
+  --card-foreground: #0a0c10;
+  --popover: #ffffff;
+  --popover-foreground: #0a0c10;
+  --primary: #3358ff;
+  --primary-foreground: #ffffff;
+  --secondary: #eaeef4;
+  --secondary-foreground: #2b3340;
+  --muted: #eef1f6;
+  --muted-foreground: #5b6575;
+  --accent: #eaeef4;
+  --accent-foreground: #0a0c10;
+  --destructive: #d1242f;
+  --destructive-foreground: #ffffff;
+  --border: #d9dee6;
+  --input: #d9dee6;
+  --ring: #3358ff;
+  --success: #1a7f37;
+  --warning: #9a6700;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Heatmap day cells */
+.heatmap-day {
+  border-radius: 2px;
 }
