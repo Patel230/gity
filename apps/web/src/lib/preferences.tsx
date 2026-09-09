@@ -25,6 +25,8 @@ const makeTheme = (label: string, vars: Partial<ThemeVars>) => ({
 });
 
 export const THEMES = {
+  "default-dark": makeTheme("Default Dark", { background: "#11121d", card: "#171827", foreground: "#cad3f5", primary: "#dbc66f", border: "#3b3d5a", accent: "#282844", mutedForeground: "#9699b5" }),
+  "default-light": makeTheme("Default Light", { background: "#f5f1e8", card: "#fffaf0", foreground: "#30281d", primary: "#9a6718", border: "#cdbd9f", accent: "#eadfca", mutedForeground: "#756650" }),
   "warm-copper": makeTheme("Warm Copper", { background: "#100b08", card: "#1c1210", foreground: "#f5e5d4", primary: "#e08b57", border: "#694737", accent: "#50301f", mutedForeground: "#c19a82" }),
   "aurora-circuit": makeTheme("Aurora Circuit", { background: "#071217", card: "#0e2026", foreground: "#d9f7f4", primary: "#62d6c6", border: "#28535a", accent: "#153d43", mutedForeground: "#8bb9bb" }),
   "cinder-bloom": makeTheme("Cinder Bloom", { background: "#1d1017", card: "#2d1723", foreground: "#f9dce8", primary: "#f28bb5", border: "#75405a", accent: "#54283f", mutedForeground: "#c28da5" }),
@@ -62,9 +64,28 @@ export const THEMES = {
   paper: makeTheme("paper", { background: "#f5f5f0", card: "#ffffff", foreground: "#303030", primary: "#365f91", border: "#c9c9c2", accent: "#e6e6df", mutedForeground: "#66665f" }),
   "gruvbox-light": makeTheme("gruvbox light", { background: "#fbf1c7", card: "#f2e5bc", foreground: "#3c3836", primary: "#af3a03", border: "#bdae93", accent: "#ebdbb2", mutedForeground: "#7c6f64" }),
   mono: makeTheme("mono", { background: "#111111", card: "#1d1d1d", foreground: "#eeeeee", primary: "#ffffff", border: "#555555", accent: "#333333", mutedForeground: "#aaaaaa" }),
+  everforest: makeTheme("Everforest", { background: "#2d353b", card: "#343f44", foreground: "#d3c6aa", primary: "#a7c080", border: "#4f585e", accent: "#475258", mutedForeground: "#9da9a0" }),
+  kanagawa: makeTheme("Kanagawa", { background: "#1f1f28", card: "#2a2a37", foreground: "#dcd7ba", primary: "#7e9cd8", border: "#54546d", accent: "#363646", mutedForeground: "#9898a7" }),
+  "one-dark": makeTheme("One Dark", { background: "#282c34", card: "#21252b", foreground: "#abb2bf", primary: "#61afef", border: "#4b5263", accent: "#333842", mutedForeground: "#7f848e" }),
+  solarized: makeTheme("Solarized", { background: "#002b36", card: "#073642", foreground: "#839496", primary: "#2aa198", border: "#586e75", accent: "#164b55", mutedForeground: "#657b83" }),
+  monokai: makeTheme("Monokai", { background: "#272822", card: "#303129", foreground: "#f8f8f2", primary: "#a6e22e", border: "#57584e", accent: "#414239", mutedForeground: "#a6a69c" }),
+  "github-dark": makeTheme("GitHub Dark", { background: "#0d1117", card: "#161b22", foreground: "#e6edf3", primary: "#2f81f7", border: "#30363d", accent: "#21262d", mutedForeground: "#8b949e" }),
+  "github-light": makeTheme("GitHub Light", { background: "#ffffff", card: "#f6f8fa", foreground: "#1f2328", primary: "#0969da", border: "#d0d7de", accent: "#eaeef2", mutedForeground: "#656d76" }),
+  "ayu-mirage": makeTheme("Ayu Mirage", { background: "#1f2430", card: "#242936", foreground: "#cbccc6", primary: "#ffcc66", border: "#4d5566", accent: "#333a4a", mutedForeground: "#8a919e" }),
+  "material-ocean": makeTheme("Material Ocean", { background: "#0f111a", card: "#1a1e2e", foreground: "#a6accd", primary: "#82aaff", border: "#3b4158", accent: "#252a3a", mutedForeground: "#717cb4" }),
+  horizon: makeTheme("Horizon", { background: "#1c1e26", card: "#232530", foreground: "#d5d8da", primary: "#e95678", border: "#4a4d5a", accent: "#343642", mutedForeground: "#a2a4ab" }),
 } as const;
 
 export type Theme = keyof typeof THEMES;
+
+/** Curated OSS palette set exposed in Settings. */
+export const FEATURED_THEMES = [
+  "default-dark", "default-light",
+  "catppuccin-macchiato", "catppuccin-mocha", "catppuccin-frappe", "catppuccin-latte",
+  "dracula", "nord", "tokyo-night", "gruvbox", "rose-pine", "rose-pine-moon",
+  "rose-pine-dawn", "everforest", "kanagawa", "one-dark", "solarized", "monokai",
+  "github-dark", "github-light", "ayu-mirage", "material-ocean",
+] as const satisfies readonly Theme[];
 
 const LIGHT_VARS = {
   background: "#f5f1e8", card: "#fffaf0", foreground: "#30281d", primary: "#9a6718",
@@ -109,14 +130,14 @@ function read<T extends string>(key: string, fallback: T): T {
 }
 
 export function PrefsProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("warm-copper");
+  const [theme, setThemeState] = useState<Theme>("catppuccin-macchiato");
   const [appearance, setAppearanceState] = useState<Appearance>("dark");
   const [poll, setPollState] = useState<PollInterval>("30s");
   const [tabVisible, setTabVisible] = useState(true);
 
   useEffect(() => {
-    const storedTheme = read("gity.theme", "warm-copper");
-    setThemeState(storedTheme in THEMES ? storedTheme as Theme : "warm-copper");
+    const storedTheme = read("gity.theme", "catppuccin-macchiato");
+    setThemeState(storedTheme in THEMES ? storedTheme as Theme : "catppuccin-macchiato");
     const storedAppearance = read("gity.appearance", "dark") as Appearance;
     setAppearanceState(storedAppearance === "light" ? "light" : "dark");
     setPollState(read("gity.poll", "30s"));

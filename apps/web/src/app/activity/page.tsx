@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState, ErrorState } from "@/components/common/error-state";
-import { PageHead } from "@/app/page";
+import { PageHead } from "@/components/layout/page-head";
 import { useActivity } from "@/features/activity/use-activity";
 import type { ActivityKind } from "@/lib/github/types";
 import { timeAgo } from "@/lib/utils";

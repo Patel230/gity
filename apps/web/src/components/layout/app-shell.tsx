@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { Menu, Moon, Sun, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { LogOut, Menu, Moon, Sun, X } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth, useViewerUser } from "@/lib/auth";
@@ -11,11 +11,12 @@ import { usePrefs } from "@/lib/preferences";
 import { cn } from "@/lib/utils";
 import { CommandPalette } from "./command-palette";
 import { BrandLogo } from "./brand-logo";
-import { NAV, SETTINGS_NAV } from "./nav";
+import { NAV } from "./nav";
 import { RateLimitBadge } from "@/components/common/rate-limit";
 import { RefreshControl } from "@/components/common/refresh-control";
 import { TokenGate } from "@/components/common/token-gate";
 import { usePaletteData } from "@/features/search/use-palette";
+import { GithubStarLink } from "@/components/common/github-star";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { token, setToken, clearToken } = useAuth();
@@ -43,18 +44,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Header onMenu={() => setSidebarOpen(true)} />
         <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-5 sm:px-5">{children}</main>
         <footer className="border-t border-border px-4 py-2 text-center text-[11px] text-muted-foreground">
-          Gity — frontend-only GitHub command center. Data lives on GitHub; your token never
-          leaves api.github.com.{" "}
-          {process.env.NEXT_PUBLIC_REPO_URL ? (
-            <a
-              href={process.env.NEXT_PUBLIC_REPO_URL}
-              target="_blank"
-              rel="noopener"
-              className="underline hover:text-foreground"
-            >
-              Star on GitHub
-            </a>
-          ) : null}
+          Developers &amp; agents managing GitHub together. Your token stays in this browser and is
+          forwarded only for GitHub requests. <GithubStarLink compact />
         </footer>
       </div>
     </div>
@@ -86,17 +77,6 @@ function SidebarBody({ onNavigate }: { onNavigate: () => void }) {
           );
         })}
         <div className="mx-2 my-2 border-t border-border" />
-        <Link
-          href={SETTINGS_NAV.href}
-          onClick={onNavigate}
-          className={cn(
-            "group flex items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-[13px] text-muted-foreground hover:bg-accent/70 hover:text-foreground",
-            pathname.startsWith(SETTINGS_NAV.href) && "nav-active mx-1 gap-3.5 rounded-[20px] bg-[color-mix(in_srgb,var(--primary)_15%,transparent)] px-4 py-4 text-[15px] font-medium text-foreground",
-          )}
-        >
-          <SETTINGS_NAV.icon className={cn("size-4 shrink-0", pathname.startsWith(SETTINGS_NAV.href) ? "text-[var(--primary)]" : "group-hover:text-[var(--primary)]")} />
-          {SETTINGS_NAV.label}
-        </Link>
       </nav>
     </>
   );
@@ -105,9 +85,10 @@ function SidebarBody({ onNavigate }: { onNavigate: () => void }) {
 function Header({ onMenu }: { onMenu: () => void }) {
   const pathname = usePathname();
   const viewer = useViewerUser();
+  const { clearToken } = useAuth();
   const { appearance, setAppearance } = usePrefs();
   const palette = usePaletteData();
-  const current = [...NAV, SETTINGS_NAV].find((item) =>
+  const current = NAV.find((item) =>
     item.href === "/" ? pathname === "/" : pathname.startsWith(item.href),
   );
   return (
@@ -134,10 +115,45 @@ function Header({ onMenu }: { onMenu: () => void }) {
       >
         {appearance === "dark" ? <Sun className="size-4 text-[var(--primary)]" /> : <Moon className="size-4 text-[var(--primary)]" />}
       </Button>
-      <Link href="/settings" className="rounded-full p-0.5 hover:bg-accent" title="Open account settings" aria-label="Open account settings">
-        <Avatar src={viewer.data?.avatarUrl} alt={viewer.data?.login ?? "GitHub profile"} className="size-8" />
-      </Link>
+      <AccountMenu viewer={viewer.data} onLogout={clearToken} />
     </header>
+  );
+}
+
+function AccountMenu({
+  viewer,
+  onLogout,
+}: {
+  viewer?: { login: string; name: string | null; avatarUrl: string; htmlUrl: string };
+  onLogout: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const close = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={() => setOpen((value) => !value)} className="rounded-full p-0.5 hover:bg-accent" title="Open account menu" aria-label="Open account menu" aria-expanded={open}>
+        <Avatar src={viewer?.avatarUrl} alt={viewer?.login ?? "GitHub profile"} className="size-8" />
+      </button>
+      {open ? (
+        <div role="menu" className="absolute right-0 top-11 z-50 w-64 rounded-xl border border-border bg-popover p-2 text-popover-foreground shadow-xl">
+          <div className="flex items-center gap-2 border-b border-border px-2 py-2.5">
+            <Avatar src={viewer?.avatarUrl} alt={viewer?.login ?? "GitHub profile"} className="size-9" />
+            <div className="min-w-0"><p className="truncate text-xs font-semibold">{viewer?.name ?? viewer?.login ?? "GitHub profile"}</p><p className="truncate text-[11px] text-muted-foreground">@{viewer?.login ?? "…"}</p></div>
+          </div>
+          <div className="py-1">
+            <Link href="/profile" onClick={() => setOpen(false)} className="block rounded-lg px-2.5 py-2 text-xs hover:bg-accent">Profile</Link>
+          </div>
+          <button onClick={onLogout} className="flex w-full items-center gap-2 rounded-lg border-t border-border px-2.5 py-2.5 text-left text-xs text-muted-foreground hover:bg-accent hover:text-foreground"><LogOut className="size-3.5" /> Sign out</button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

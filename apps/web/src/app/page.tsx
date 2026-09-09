@@ -26,6 +26,7 @@ import { useOverview } from "@/features/overview/use-overview";
 import { IssueActivityChart, PrActivityChart } from "@/features/overview/charts";
 import { useStreak } from "@/features/streak/use-streak";
 import { timeAgo } from "@/lib/utils";
+import { PageHead } from "@/components/layout/page-head";
 
 export default function OverviewPage() {
   const ov = useOverview();
@@ -184,20 +185,6 @@ export default function OverviewPage() {
           <RateLimitPanel />
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-export function PageHead({ title, sub, right }: { title: string; sub?: string; right?: React.ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-3 border-b border-border/60 pb-3">
-      <div className="relative pl-3">
-        <span className="absolute bottom-0 left-0 top-0 w-0.5 rounded-full bg-primary" />
-        <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--primary)]">gity / {title.toLowerCase()}</p>
-        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-        {sub ? <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p> : null}
-      </div>
-      {right}
     </div>
   );
 }

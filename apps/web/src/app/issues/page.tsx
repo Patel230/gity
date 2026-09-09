@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TD, TH, THead, TR, Table } from "@/components/ui/table";
 import { EmptyState, ErrorState } from "@/components/common/error-state";
-import { PageHead } from "@/app/page";
+import { PageHead } from "@/components/layout/page-head";
 import { useIssues } from "@/features/pull-requests/use-prs-issues";
 import { ageInDays, timeAgo } from "@/lib/utils";
 

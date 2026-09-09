@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/common/error-state";
 import { StatCard, StatCardLoading } from "@/components/common/stat-card";
-import { PageHead } from "@/app/page";
+import { PageHead } from "@/components/layout/page-head";
 import { useActions } from "@/features/actions/use-actions";
 import type { GithubWorkflowRun } from "@/lib/github/types";
 import { timeAgo } from "@/lib/utils";
@@ -55,7 +55,7 @@ export default function ActionsPage() {
 
       <Card accent={19}>
         <CardHeader>
-          <CardTitle>Latest run per repository</CardTitle>
+          <CardTitle>Recent completed runs by repository</CardTitle>
           <CardDescription>{latestPerRepo.length} repos with workflow data</CardDescription>
         </CardHeader>
         <CardContent className="space-y-1">

@@ -32,6 +32,7 @@ export function useActions() {
   const latestPerRepo = [...byRepo.values()].sort(
     (a, b) => rank(a) - rank(b) || b.updatedAt.localeCompare(a.updatedAt),
   );
+  const activeIds = new Set([...running, ...queued].map((r) => r.id));
 
   return {
     runs,
@@ -39,7 +40,9 @@ export function useActions() {
     running,
     queued,
     succeeded,
-    latestPerRepo,
+    // Active runs are already shown in the live panel; keep them out of the
+    // repository list so a workflow never appears twice on the page.
+    latestPerRepo: latestPerRepo.filter((r) => !activeIds.has(r.id)),
     isLoading: runsQ.isLoading || reposQ.isLoading,
     error: (runsQ.error ?? reposQ.error) as Error | null,
     dataUpdatedAt: runsQ.dataUpdatedAt,

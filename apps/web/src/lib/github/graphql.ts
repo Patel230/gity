@@ -142,6 +142,15 @@ export const REPO_PRS_QUERY = /* GraphQL */ `
           reviewRequests(first: 5) {
             totalCount
           }
+          commits(last: 1) {
+            nodes {
+              commit {
+                statusCheckRollup {
+                  state
+                }
+              }
+            }
+          }
           createdAt
           updatedAt
           additions
@@ -159,6 +168,24 @@ export const REPO_PRS_QUERY = /* GraphQL */ `
       limit
       remaining
       resetAt
+    }
+  }
+`;
+
+export const PR_CI_QUERY = /* GraphQL */ `
+  query GityPullRequestCi($owner: String!, $name: String!, $number: Int!) {
+    repository(owner: $owner, name: $name) {
+      pullRequest(number: $number) {
+        commits(last: 1) {
+          nodes {
+            commit {
+              statusCheckRollup {
+                state
+              }
+            }
+          }
+        }
+      }
     }
   }
 `;

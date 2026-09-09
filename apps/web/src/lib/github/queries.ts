@@ -12,6 +12,7 @@ import {
   fetchContributionDays,
   fetchOrgs,
   fetchRepoCiState,
+  fetchPullRequestCiState,
   fetchRepoOpenPrs,
   fetchRepoWorkflowRuns,
   fetchSearchPrsAndIssues,
@@ -56,6 +57,7 @@ export const qk = {
   orgs: (fp: string) => ["gity", fp, "orgs"] as const,
   repos: (fp: string) => ["gity", fp, "repos"] as const,
   ciStates: (fp: string) => ["gity", fp, "ci-states"] as const,
+  prCiStates: (fp: string) => ["gity", fp, "pr-ci-states"] as const,
   // PR/issue/event keys include the login + repo signature so the first fetch
   // happens only when dependencies arrive (no stale empty cache), and refires
   // exactly once when they do. `depth` separates the fast head query used for
@@ -183,6 +185,37 @@ export function ciStatesOptions(
           const repo = queue.shift()!;
           const [owner, name] = repo.fullName.split("/");
           out[repo.fullName] = await fetchRepoCiState(token!, owner, name);
+        }
+      });
+      await Promise.all(workers);
+      return out;
+    },
+    enabled: !!token && targets.length > 0,
+    staleTime: 60_000,
+    gcTime: 10 * 60_000,
+    retry: (count, err) => retryPolicy(count, err),
+  });
+}
+
+/** Head-commit CI states for the PRs currently visible in the listing. */
+export function prCiStatesOptions(
+  token: string | null,
+  fp: string,
+  prs: GithubPullRequest[] | undefined,
+) {
+  const targets = (prs ?? []).slice(0, 100);
+  const ids = targets.map((p) => `${p.repoFullName}#${p.number}`).join(",");
+  return queryOptions<Record<string, GithubRepo["ciState"]>, GithubApiError>({
+    ...CALM,
+    queryKey: [...qk.prCiStates(fp), ids],
+    queryFn: async () => {
+      const out: Record<string, GithubRepo["ciState"]> = {};
+      const queue = [...targets];
+      const workers = Array.from({ length: 6 }, async () => {
+        while (queue.length) {
+          const pr = queue.shift()!;
+          const [owner, name] = pr.repoFullName.split("/");
+          out[`${pr.repoFullName}#${pr.number}`] = await fetchPullRequestCiState(token!, owner, name, pr.number);
         }
       });
       await Promise.all(workers);

@@ -10,7 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TD, TH, THead, TR, Table } from "@/components/ui/table";
 import { EmptyState, ErrorState } from "@/components/common/error-state";
-import { PageHead } from "@/app/page";
+import { CiDot } from "@/components/common/ci-dot";
+import { PageHead } from "@/components/layout/page-head";
 import { usePullRequests } from "@/features/pull-requests/use-prs-issues";
 import type { GithubPullRequest } from "@/lib/github/types";
 import { ageInDays, timeAgo } from "@/lib/utils";
@@ -18,7 +19,7 @@ import { ageInDays, timeAgo } from "@/lib/utils";
 type Tab = "open" | "draft" | "review" | "approved" | "merged" | "closed" | "stale" | "all";
 
 export default function PullRequestsPage() {
-  const { prs, repos, isLoading, error } = usePullRequests();
+  const { prs, repos, prCiStates, isLoading, error } = usePullRequests();
   const [tab, setTab] = useState<Tab>("open");
   const [org, setOrg] = useState("all");
   const [repo, setRepo] = useState("all");
@@ -92,6 +93,7 @@ export default function PullRequestsPage() {
               <TH>Author</TH>
               <TH>State</TH>
               <TH>Review</TH>
+              <TH>CI/CD</TH>
               <TH className="text-right">Age</TH>
               <TH className="text-right">Updated</TH>
             </TR>
@@ -122,6 +124,7 @@ export default function PullRequestsPage() {
                 </TD>
                 <TD><StateBadge state={p.state} /></TD>
                 <TD><ReviewBadge p={p} /></TD>
+                <TD><CiDot state={prCiStates[`${p.repoFullName}#${p.number}`] ?? "unknown"} showLabel /></TD>
                 <TD className="whitespace-nowrap text-right text-xs text-muted-foreground">{Math.floor(ageInDays(p.createdAt))}d</TD>
                 <TD className="whitespace-nowrap text-right text-xs text-muted-foreground">{timeAgo(p.updatedAt)}</TD>
               </TR>
@@ -148,7 +151,7 @@ function countBy(prs: GithubPullRequest[]): Record<Tab, number> {
   };
 }
 
-export function StateBadge({ state }: { state: GithubPullRequest["state"] }) {
+function StateBadge({ state }: { state: GithubPullRequest["state"] }) {
   const map = {
     open: <Badge variant="success">open</Badge>,
     draft: <Badge variant="outline">draft</Badge>,
@@ -158,7 +161,7 @@ export function StateBadge({ state }: { state: GithubPullRequest["state"] }) {
   return map[state];
 }
 
-export function ReviewBadge({ p }: { p: GithubPullRequest }) {
+function ReviewBadge({ p }: { p: GithubPullRequest }) {
   switch (p.reviewState) {
     case "approved":
       return <Badge variant="success">approved</Badge>;
@@ -169,7 +172,7 @@ export function ReviewBadge({ p }: { p: GithubPullRequest }) {
     case "commented":
       return <Badge variant="default">commented</Badge>;
     default:
-      return <span className="text-xs text-muted-foreground">—</span>;
+      return <span className="whitespace-nowrap text-xs text-muted-foreground">Not reviewed</span>;
   }
 }
 

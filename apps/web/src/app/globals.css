@@ -27,7 +27,7 @@
   --font-display: var(--font-ibm-plex-mono), ui-monospace, monospace;
 }
 
-/* Dark mode first — Gity is a dark-first developer dashboard. */
+/* Dark mode first — Gity is a dark-first workspace. */
 :root,
 .dark {
   --background: #11121d;

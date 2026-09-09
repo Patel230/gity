@@ -11,6 +11,8 @@ export interface GithubUser {
   name: string | null;
   avatarUrl: string;
   htmlUrl: string;
+  /** CI state for the PR head commit when available. */
+  ciState?: CiState;
 }
 
 export interface GithubOrg {
@@ -82,6 +84,8 @@ export interface GithubPullRequest {
   deletions: number;
   changedFiles: number;
   htmlUrl: string;
+  /** CI state for the PR head commit when available. */
+  ciState?: CiState;
   /** True when the record came from the issue-search index (review fields may be partial). */
   fromSearchIndex: boolean;
 }

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/common/error-state";
-import { PageHead } from "@/app/page";
+import { PageHead } from "@/components/layout/page-head";
 import { useOrganizations } from "@/features/organizations/use-organizations";
 import { timeAgo } from "@/lib/utils";
 import { cn } from "@/lib/utils";

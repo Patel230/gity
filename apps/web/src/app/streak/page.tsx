@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { EmptyState, ErrorState } from "@/components/common/error-state";
 import { Heatmap } from "@/components/common/heatmap";
 import { StatCard, StatCardLoading } from "@/components/common/stat-card";
-import { PageHead } from "@/app/page";
+import { PageHead } from "@/components/layout/page-head";
 import { useStreak } from "@/features/streak/use-streak";
 
 export default function StreakPage() {

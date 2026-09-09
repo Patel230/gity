@@ -6,6 +6,7 @@ import { graphqlFetch, restFetch, restFetchAll } from "./client";
 import {
   CONTRIBUTIONS_QUERY,
   ORGS_QUERY,
+  PR_CI_QUERY,
   REPO_CI_QUERY,
   REPO_PRS_QUERY,
   REPOS_QUERY,
@@ -248,6 +249,29 @@ export async function fetchRepoCiState(
   }
 }
 
+/** CI state for a pull request's latest head commit. */
+export async function fetchPullRequestCiState(
+  token: string,
+  owner: string,
+  name: string,
+  number: number,
+): Promise<CiState> {
+  try {
+    const data = await graphqlFetch<{
+      repository: {
+        pullRequest: {
+          commits: { nodes: Array<{ commit: { statusCheckRollup: { state: string } | null } | null }> };
+        } | null;
+      } | null;
+    }>(token, PR_CI_QUERY, { owner, name, number });
+    return ciStateFromRollup(
+      data.repository?.pullRequest?.commits.nodes[0]?.commit?.statusCheckRollup?.state,
+    );
+  } catch {
+    return "unknown";
+  }
+}
+
 /* ------------------------------- PRs / issues ------------------------------ */
 
 function reviewStateFrom(
@@ -468,12 +492,32 @@ interface RepoPrNode {
   author: { login: string; avatarUrl: string } | null;
   reviewDecision: string | null;
   reviewRequests: { totalCount: number };
+  commits: {
+    nodes: Array<{
+      commit: { statusCheckRollup: { state: string } | null } | null;
+    }>;
+  };
   createdAt: string;
   updatedAt: string;
   additions: number;
   deletions: number;
   changedFiles: number;
   url: string;
+}
+
+function ciStateFromRollup(state: string | null | undefined): CiState {
+  switch (state) {
+    case "SUCCESS":
+      return "passing";
+    case "FAILURE":
+    case "ERROR":
+      return "failing";
+    case "PENDING":
+    case "EXPECTED":
+      return "pending";
+    default:
+      return state ? "no-checks" : "unknown";
+  }
 }
 
 /** Open PRs for one repo (detailed — review decisions included). */
@@ -517,6 +561,7 @@ export async function fetchRepoOpenPrs(
       deletions: n.deletions,
       changedFiles: n.changedFiles,
       htmlUrl: n.url,
+      ciState: ciStateFromRollup(n.commits.nodes[0]?.commit?.statusCheckRollup?.state),
       fromSearchIndex: false,
     }));
   } catch {

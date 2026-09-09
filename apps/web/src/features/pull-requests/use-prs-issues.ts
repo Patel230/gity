@@ -3,6 +3,8 @@
 import { useAuth, useViewerUser } from "@/lib/auth";
 import {
   allIssuesOptions,
+  ciStatesOptions,
+  prCiStatesOptions,
   fetchIssueDelta,
   fetchPrDelta,
   mergedPrsOptions,
@@ -20,6 +22,7 @@ export function usePullRequests() {
   const viewer = useViewerUser();
   const login = viewer.data?.login;
   const reposQ = useLiveQuery({ ...reposOptions(token, fp) });
+  const ciQ = useLiveQuery({ ...ciStatesOptions(token, fp, reposQ.data) });
   const openQ = useDeltaSearch<GithubPullRequest>(
     { ...openPrsOptions(token, fp, login, reposQ.data) },
     "prs-open",
@@ -36,11 +39,15 @@ export function usePullRequests() {
   const prs = [...(openQ.data ?? []), ...(mergedQ.data ?? [])];
   const seen = new Set<string>();
   const deduped = prs.filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
+  const sorted = deduped.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const prCiQ = useLiveQuery({ ...prCiStatesOptions(token, fp, sorted) });
 
   return {
-    prs: deduped.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    prs: sorted,
     openCount: openQ.data?.length ?? 0,
     repos: reposQ.data ?? [],
+    ciStates: ciQ.data ?? {},
+    prCiStates: prCiQ.data ?? {},
     isLoading: openQ.isLoading || mergedQ.isLoading,
     error: (openQ.error ?? mergedQ.error) as Error | null,
     dataUpdatedAt: Math.max(openQ.dataUpdatedAt, mergedQ.dataUpdatedAt),

@@ -1,12 +1,13 @@
 "use client";
 
-import { Activity, CircleDot, Database, GitMerge, GitPullRequest, KeyRound, Loader, Play, ShieldAlert, Zap } from "lucide-react";
+import { Bot, KeyRound, Loader, ShieldAlert, ShieldCheck, Workflow } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { startLogin } from "@/lib/oauth";
 import { BrandLogo } from "@/components/layout/brand-logo";
+import { GithubStarLink } from "@/components/common/github-star";
 
 /** Rendered when no token is stored — GitHub login preferred, PAT fallback. */
 export function TokenGate({ onSave }: { onSave: (token: string) => void }) {
@@ -26,22 +27,19 @@ export function TokenGate({ onSave }: { onSave: (token: string) => void }) {
     }
   };
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-6xl items-center px-4 py-8 sm:px-6 lg:py-12">
-      <div className="grid w-full items-center gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16">
+    <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col items-start px-4 pb-8 pt-8 sm:px-6 sm:pt-10 lg:pt-12">
+      <div className="grid w-full items-start gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16">
       <div>
         <div className="flex items-center justify-between gap-3">
-          <BrandLogo className="text-2xl" markClassName="size-10 rounded-xl" />
-          <span className="hidden rounded-full border border-border px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground sm:inline-flex">Developer dashboard</span>
+          <div className="flex items-center gap-4">
+            <BrandLogo className="text-2xl" markClassName="size-10 rounded-xl" />
+            <GithubStarLink />
+          </div>
         </div>
         <div className="mt-12 max-w-2xl">
           <div className="mb-4 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-[var(--primary)]"><span className="size-1.5 rounded-full bg-[var(--primary)]" /> GitHub, without the noise</div>
-          <h1 className="font-display text-4xl font-semibold leading-[1.08] tracking-tight sm:text-6xl">A calmer way to run your GitHub day.</h1>
+          <h1 className="font-display text-4xl font-semibold leading-[1.08] tracking-tight sm:text-6xl">Developers &amp; agents managing GitHub together.</h1>
           <p className="mt-5 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">Gity brings repositories, organizations, pull requests, issues, Actions, and activity into one focused command center.</p>
-        </div>
-        <LandingPreview />
-        <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5"><ShieldAlert className="size-3.5 text-[var(--primary)]" /> Token stays in your browser</span>
-          <span className="inline-flex items-center gap-1.5"><Zap className="size-3.5 text-[var(--primary)]" /> No setup beyond GitHub</span>
         </div>
       </div>
       <div>
@@ -97,62 +95,43 @@ export function TokenGate({ onSave }: { onSave: (token: string) => void }) {
           <div className="flex gap-2 rounded-md border border-[color-mix(in_srgb,var(--warning)_50%,var(--border))] bg-[color-mix(in_srgb,var(--warning)_8%,transparent)] p-2.5 text-[11px] leading-relaxed text-muted-foreground">
             <ShieldAlert className="mt-0.5 size-4 shrink-0 text-[var(--warning)]" />
             <span>
-              Frontend-only storage is suitable for personal/local use — it is{" "}
-              <strong>not appropriate for a public multi-user deployment</strong>. Anyone with
-              access to this browser profile can read the token.
+              Your token stays in this browser. Use Gity on a trusted device and never share this
+              browser profile. For team or public deployments, use a server-side authentication flow.
             </span>
           </div>
         </CardContent>
       </Card>
       </div>
-      <div className="col-span-full grid gap-3 border-t border-border/70 pt-5 sm:grid-cols-3">
-        <LandingFeature icon={Database} title="Everything in view" detail="Repos, orgs, PRs, issues, and Actions in one workspace." />
-        <LandingFeature icon={GitMerge} title="Follow the flow" detail="Spot what changed, what is blocked, and what needs you." />
-        <LandingFeature icon={ShieldAlert} title="Private by design" detail="No database, no proxy, and no token leaving your browser." />
       </div>
+      <div className="mt-10 grid w-full gap-3 border-t border-border/70 pt-6 sm:grid-cols-3">
+        <Card accent={1} className="bg-card/60">
+          <CardHeader className="pb-2">
+            <ShieldCheck className="size-5 text-[var(--success)]" />
+            <CardTitle className="text-sm">Private by default</CardTitle>
+          </CardHeader>
+          <CardContent className="text-xs leading-relaxed text-muted-foreground">
+            Your credential stays in this browser and requests go directly to GitHub.
+          </CardContent>
+        </Card>
+        <Card accent={2} className="bg-card/60">
+          <CardHeader className="pb-2">
+            <Workflow className="size-5 text-[var(--primary)]" />
+            <CardTitle className="text-sm">One focused workspace</CardTitle>
+          </CardHeader>
+          <CardContent className="text-xs leading-relaxed text-muted-foreground">
+            Repositories, pull requests, issues, Actions, and activity in one clear view.
+          </CardContent>
+        </Card>
+        <Card accent={3} className="bg-card/60">
+          <CardHeader className="pb-2">
+            <Bot className="size-5 text-[var(--info)]" />
+            <CardTitle className="text-sm">Ready for agents</CardTitle>
+          </CardHeader>
+          <CardContent className="text-xs leading-relaxed text-muted-foreground">
+            Give developers and automation the same calm, searchable GitHub command center.
+          </CardContent>
+        </Card>
       </div>
-    </div>
-  );
-}
-
-function LandingPoint({ icon: Icon, title, detail }: { icon: typeof Activity; title: string; detail: string }) {
-  return (
-    <div className="flex items-start gap-3 rounded-xl border border-border/70 bg-card/45 p-3">
-      <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--primary)_14%,transparent)] text-[var(--primary)]"><Icon className="size-3.5" /></span>
-      <span><strong className="block text-xs text-foreground">{title}</strong><span className="mt-0.5 block text-[11px] text-muted-foreground">{detail}</span></span>
-    </div>
-  );
-}
-
-function LandingPreview() {
-  return (
-    <Card accent={11} className="mt-9 max-w-xl overflow-hidden bg-card/70">
-      <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
-        <span className="font-mono text-[10px] text-muted-foreground">gity / overview</span>
-        <span className="inline-flex items-center gap-1.5 text-[10px] text-[var(--success)]"><span className="size-1.5 rounded-full bg-[var(--success)]" /> Live</span>
-      </div>
-      <div className="grid grid-cols-2 gap-px bg-border sm:grid-cols-4">
-        <PreviewStat icon={Database} value="24" label="repos" />
-        <PreviewStat icon={GitPullRequest} value="08" label="open PRs" />
-        <PreviewStat icon={CircleDot} value="13" label="issues" />
-        <PreviewStat icon={Play} value="02" label="running" />
-      </div>
-      <div className="flex items-center gap-2 px-3 py-3 text-[11px] text-muted-foreground">
-        <Activity className="size-3.5 text-[var(--primary)]" /> <span>Recent activity across your workspace</span><span className="ml-auto font-mono text-[10px]">just now</span>
-      </div>
-    </Card>
-  );
-}
-
-function PreviewStat({ icon: Icon, value, label }: { icon: typeof Database; value: string; label: string }) {
-  return <div className="bg-card px-3 py-3"><Icon className="size-3.5 text-[var(--primary)]" /><p className="mt-2 font-mono text-lg font-semibold text-foreground">{value}</p><p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{label}</p></div>;
-}
-
-function LandingFeature({ icon: Icon, title, detail }: { icon: typeof Database; title: string; detail: string }) {
-  return (
-    <div className="flex items-start gap-3 rounded-xl border border-border/70 bg-card/35 p-3.5">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--primary)_12%,transparent)] text-[var(--primary)]"><Icon className="size-4" /></span>
-      <span><strong className="block text-xs text-foreground">{title}</strong><span className="mt-1 block text-[11px] leading-relaxed text-muted-foreground">{detail}</span></span>
     </div>
   );
 }

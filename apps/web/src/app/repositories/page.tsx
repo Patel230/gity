@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TD, TH, THead, TR, Table } from "@/components/ui/table";
 import { CiDot } from "@/components/common/ci-dot";
 import { EmptyState, ErrorState } from "@/components/common/error-state";
-import { PageHead } from "@/app/page";
+import { PageHead } from "@/components/layout/page-head";
 import { useRepositories } from "@/features/repositories/use-repositories";
 import { formatNumber, timeAgo } from "@/lib/utils";
 

@@ -1,6 +1,7 @@
 /**
  * Low-level GitHub transport.
- * - Browser → api.github.com only. No proxy, no backend.
+ * - Browser → api.github.com by default, with a same-origin relay fallback
+ *   when a local network blocker prevents direct access.
  * - Token is passed in per call (never read from env).
  * - Maps failures to GithubApiError and records rate limits.
  */
@@ -33,6 +34,10 @@ async function readErrorMessage(res: Response): Promise<string> {
     /* non-JSON body */
   }
   return "";
+}
+
+async function proxyFetch(url: string, init: RequestInit): Promise<Response> {
+  return fetch(`/api/github?url=${encodeURIComponent(url)}`, init);
 }
 
 function classifyRestError(res: Response, message: string): GithubApiError {
@@ -84,12 +89,19 @@ export async function restFetch<T>(
       ...init,
       headers: { ...authHeaders(token), ...(init?.headers ?? {}) },
     });
-  } catch (e) {
-    throw new GithubApiError(
-      "blocked",
-      0,
-      "Request to GitHub was blocked before it completed (the browser reports CORS/network failure). This is almost always a local blocker — ad-blocker, privacy extension, VPN, firewall, or antivirus — not a Gity bug. See Settings → Connection test.",
-    );
+  } catch {
+    try {
+      res = await proxyFetch(url.toString(), {
+        ...init,
+        headers: { ...authHeaders(token), ...(init?.headers ?? {}) },
+      });
+    } catch {
+      throw new GithubApiError(
+        "blocked",
+        0,
+        "GitHub could not be reached directly or through Gity's relay. Check your network, VPN, firewall, or browser extensions, then retry.",
+      );
+    }
   }
   recordRestRateLimit(res.headers);
   if (!res.ok) throw classifyRestError(res, await readErrorMessage(res));
@@ -155,12 +167,20 @@ export async function graphqlFetch<T>(
       },
       body: JSON.stringify({ query, variables }),
     });
-  } catch (e) {
-    throw new GithubApiError(
-      "blocked",
-      0,
-      "Request to GitHub was blocked before it completed (the browser reports CORS/network failure). This is almost always a local blocker — ad-blocker, privacy extension, VPN, firewall, or antivirus — not a Gity bug. See Settings → Connection test.",
-    );
+  } catch {
+    try {
+      res = await proxyFetch(GRAPHQL_URL, {
+        method: "POST",
+        headers: { ...authHeaders(token), "Content-Type": "application/json" },
+        body: JSON.stringify({ query, variables }),
+      });
+    } catch {
+      throw new GithubApiError(
+        "blocked",
+        0,
+        "GitHub could not be reached directly or through Gity's relay. Check your network, VPN, firewall, or browser extensions, then retry.",
+      );
+    }
   }
   recordRestRateLimit(res.headers, "rest");
   if (res.status === 401)
