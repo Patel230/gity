@@ -3,11 +3,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Gity is an **open-source (MIT)** personal GitHub dashboard on the edge: a static
-Next.js frontend on **Cloudflare Pages** plus three tiny **Pages Functions** that exist
-only to complete GitHub login. **GitHub itself is the source of truth**: the browser
-fetches data directly from the GitHub REST and GraphQL APIs. No database, no Redis,
-no webhooks, no MCP server. Connect with GitHub and it works across your public and
-private repositories.
+Next.js frontend on **Cloudflare Pages** plus small **Pages Functions** for GitHub
+login, relay retries, and the optional protected read-only agent API. **GitHub itself
+is the source of truth**: the browser fetches data directly from the GitHub REST and
+GraphQL APIs. No database, no Redis, and no webhooks. Connect with GitHub and it
+works across your public and private repositories.
 
 ## Architecture
 
