@@ -71,13 +71,14 @@ GitHub requires a `client_secret` to exchange login codes, so the swap happens i
 
 ## Hosting on Cloudflare
 
-Gity builds as a fully static export (`output: "export"` → `out/`) plus `functions/`.
-Deploy via the Cloudflare dashboard (free, no repo secrets needed):
+Monorepo layout: `apps/web` is the deployable project (Next.js static export in
+`out/` + `functions/`). Deploy via the Cloudflare dashboard (free):
 
 1. Cloudflare dashboard → **Workers & Pages → Create → Pages → Connect to Git** →
    select `Patel230/gity`.
-2. Build settings: framework preset **Next.js (Static HTML Export)**, build command
-   `npm run build`, output directory `out`. (Root is the repo root.)
+2. Build settings: **Root directory `apps/web`**, framework preset **Next.js
+   (Static HTML Export)**, build command `npm run build`, output directory `out`.
+   (Dependencies install inside `apps/web` — it is self-contained.)
 3. Every push to `main` redeploys automatically, with preview URLs per PR.
 4. Add the `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` environment variables as above
    to enable login, then register the Callback URL on the GitHub App.
