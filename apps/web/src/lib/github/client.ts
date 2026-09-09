@@ -159,7 +159,10 @@ export async function graphqlFetch<T>(
 ): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(GRAPHQL_URL, {
+    // GitHub's GraphQL endpoint does not reliably expose CORS headers for
+    // browser requests. Use our same-origin relay first to avoid a noisy,
+    // failed cross-origin request on every page load.
+    res = await proxyFetch(GRAPHQL_URL, {
       method: "POST",
       headers: {
         ...authHeaders(token),
@@ -169,7 +172,7 @@ export async function graphqlFetch<T>(
     });
   } catch {
     try {
-      res = await proxyFetch(GRAPHQL_URL, {
+      res = await fetch(GRAPHQL_URL, {
         method: "POST",
         headers: { ...authHeaders(token), "Content-Type": "application/json" },
         body: JSON.stringify({ query, variables }),

@@ -20,21 +20,42 @@ export async function onRequest({ request }: { request: Request }): Promise<Resp
     return Response.json({ error: "upstream_not_allowed" }, { status: 400 });
   }
 
-  const headers = new Headers(request.headers);
-  headers.delete("host");
-  headers.set("Accept", "application/vnd.github+json");
-  headers.set("X-GitHub-Api-Version", "2022-11-28");
+  // Rebuild the upstream request instead of forwarding browser/Cloudflare
+  // metadata (Origin, Referer, content-length, sec-fetch-*, etc.). Those
+  // headers are not useful to GitHub and can make a streamed POST fail.
+  const headers = new Headers({
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "Gity-GitHub-Relay",
+  });
+  const authorization = request.headers.get("authorization");
+  const contentType = request.headers.get("content-type");
+  if (authorization) headers.set("Authorization", authorization);
+  if (contentType) headers.set("Content-Type", contentType);
 
-  let upstream: Response;
-  try {
-    upstream = await fetch(target, {
-      method: request.method,
-      headers,
-      body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body,
-    });
-  } catch {
-    return Response.json({ error: "upstream_unreachable" }, { status: 502 });
+  let body: ArrayBuffer | undefined;
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    try {
+      body = await request.arrayBuffer();
+    } catch {
+      return Response.json({ error: "bad_request" }, { status: 400 });
+    }
   }
+
+  let upstream: Response | undefined;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      upstream = await fetch(target, {
+        method: request.method,
+        headers,
+        body,
+      });
+      break;
+    } catch {
+      if (attempt === 1) return Response.json({ error: "upstream_unreachable" }, { status: 502 });
+    }
+  }
+  if (!upstream) return Response.json({ error: "upstream_unreachable" }, { status: 502 });
 
   const responseHeaders = new Headers(upstream.headers);
   responseHeaders.delete("set-cookie");
