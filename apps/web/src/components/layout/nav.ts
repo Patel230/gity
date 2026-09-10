@@ -10,12 +10,14 @@ import {
   Settings,
   Bot,
   Network,
+  Layers3,
 } from "lucide-react";
 
 export const NAV = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/organizations", label: "Orgs", icon: Building2 },
   { href: "/graph", label: "Graph", icon: Network },
+  { href: "/linear", label: "Linear", icon: Layers3 },
   { href: "/repositories", label: "Repos", icon: Database },
   { href: "/pull-requests", label: "PRs", icon: GitPullRequest },
   { href: "/issues", label: "Issues", icon: CircleDot },

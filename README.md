@@ -17,8 +17,10 @@ Browser / Gity (Cloudflare Pages, static)
 Pages Functions (same origin)
    ├── /api/exchange, /api/refresh, /api/logout, /api/session
    ├── /api/github ──► GitHub REST + GraphQL
+   ├── /api/linear ──► Linear GraphQL + OAuth2
    └── D1 (Drizzle ORM)
        ├── encrypted OAuth sessions
+       ├── encrypted Linear connections
        └── 60-second per-user GitHub response cache
 ```
 
@@ -61,6 +63,23 @@ renews automatically while the tab is open. GitHub tokens never enter browser st
 
 **2. Personal access token.** Fine-grained PAT pasted in the browser, stored in
 localStorage or sessionStorage. Identical data access — the offline-capable fallback.
+
+### Linear integration (read-only)
+
+The `/linear` page connects one Linear workspace per GitHub user through Linear OAuth2
+with PKCE. Gity reads teams, projects, and recent issues through Linear's GraphQL API;
+it does not create or modify Linear data. OAuth tokens are encrypted in the D1
+`linear_connections` table and are never sent to the browser.
+
+To enable it, create a Linear OAuth application and register:
+
+```text
+https://<your-pages-domain>/api/linear/callback
+```
+
+Add `LINEAR_CLIENT_ID` and encrypted `LINEAR_CLIENT_SECRET` to the Cloudflare Pages
+project, apply `npm run db:migrate:remote` from `apps/web`, and redeploy. The current
+production callback is `https://gity-49t.pages.dev/api/linear/callback`.
 
 ### Enabling “Connect with GitHub” (deployer setup, one time)
 

@@ -47,3 +47,22 @@ export const githubCache = sqliteTable(
     expiresAtIndex: index("github_cache_expires_at_idx").on(table.expiresAt),
   }),
 );
+
+export const linearConnections = sqliteTable(
+  "linear_connections",
+  {
+    userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+    linearUserId: text("linear_user_id").notNull(),
+    linearUserName: text("linear_user_name"),
+    workspaceName: text("workspace_name"),
+    accessTokenEncrypted: text("access_token_encrypted").notNull(),
+    refreshTokenEncrypted: text("refresh_token_encrypted"),
+    scope: text("scope").notNull().default("read"),
+    expiresAt: integer("expires_at"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => ({
+    expiresAtIndex: index("linear_connections_expires_at_idx").on(table.expiresAt),
+  }),
+);

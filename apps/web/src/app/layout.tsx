@@ -20,7 +20,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Developers & agents managing GitHub together.",
   description:
-    "A frontend-only personal GitHub dashboard: orgs, repos, PRs, issues, Actions, activity and streaks. GitHub is the source of truth.",
+    "A secure workspace dashboard for GitHub and Linear: organizations, repositories, pull requests, issues, Actions, projects, activity and streaks.",
   icons: {
     icon: [{ url: "/gity-favicon.png?v=2", type: "image/png" }],
     apple: "/gity-logo.png",

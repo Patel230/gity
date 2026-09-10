@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, LogOut, Menu, Moon, Sun, X } from "lucide-react";
+import { LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, Sun, X } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth, useViewerUser } from "@/lib/auth";
@@ -90,7 +90,7 @@ function SidebarBody({ collapsed = false, onToggle, onNavigate, showToggle = tru
     <>
       <div className={cn("flex items-center pb-3 pt-4", collapsed ? "justify-center px-2" : "justify-between px-4")}>
         <BrandLogo showName={!collapsed} />
-        {showToggle ? <Button size="icon" variant="ghost" onClick={onToggle} title={collapsed ? "Expand sidebar" : "Collapse sidebar"} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>{collapsed ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}</Button> : null}
+        {showToggle ? <Button size="icon" variant="ghost" onClick={onToggle} title={collapsed ? "Expand sidebar" : "Collapse sidebar"} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>{collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}</Button> : null}
       </div>
       <nav className="flex-1 space-y-0.5 overflow-auto px-2">
         {NAV.map((item) => {

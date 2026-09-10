@@ -80,6 +80,10 @@ async function encrypt(env: GityEnv, value: string): Promise<string> {
   return base64url(iv) + "." + base64url(new Uint8Array(encrypted));
 }
 
+export async function encryptSecret(env: GityEnv, value: string): Promise<string> {
+  return encrypt(env, value);
+}
+
 async function decrypt(env: GityEnv, value: string): Promise<string> {
   const [ivPart, encryptedPart] = value.split(".");
   if (!ivPart || !encryptedPart) throw new Error("Invalid encrypted session value.");
@@ -89,6 +93,10 @@ async function decrypt(env: GityEnv, value: string): Promise<string> {
     fromBase64url(encryptedPart) as unknown as BufferSource,
   );
   return new TextDecoder().decode(plain);
+}
+
+export async function decryptSecret(env: GityEnv, value: string): Promise<string> {
+  return decrypt(env, value);
 }
 
 function randomValue(bytes = 32): string {
