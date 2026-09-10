@@ -21,6 +21,11 @@ export interface LinearIssue {
   assignee: { name: string } | null;
   team: { name: string; key: string } | null;
   project: { name: string } | null;
+  priority: number;
+  dueDate: string | null;
+  estimate: number | null;
+  cycle: { name: string | null } | null;
+  labels: { name: string; color: string }[];
 }
 export interface LinearDocument { id: string; title: string; url: string; updatedAt: string; creator: { name: string } | null }
 

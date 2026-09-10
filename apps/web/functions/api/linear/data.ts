@@ -23,6 +23,15 @@ const DOCUMENTS_QUERY = `query GityLinearDocuments {
     nodes { id title url updatedAt creator { name } }
   }
 }`;
+const ISSUE_DETAILS_QUERY = `query GityLinearIssueDetails {
+  issues(first: 100, orderBy: updatedAt) {
+    nodes {
+      id priority dueDate estimate
+      cycle { name }
+      labels { nodes { name color } }
+    }
+  }
+}`;
 
 type RawData = {
   viewer?: { id: string; name: string | null };
@@ -34,9 +43,15 @@ type RawData = {
     assignee: { name: string } | null;
     team: { name: string; key: string } | null;
     project: { name: string } | null;
+    priority?: number;
+    dueDate?: string | null;
+    estimate?: number | null;
+    cycle?: { name: string | null } | null;
+    labels?: { nodes: { name: string; color: string }[] };
   }[] };
 };
 type RawDocuments = { nodes: { id: string; title: string; url: string; updatedAt: string; creator: { name: string } | null }[] };
+type RawIssueDetails = { nodes: { id: string; priority: number; dueDate: string | null; estimate: number | null; cycle: { name: string | null } | null; labels: { nodes: { name: string; color: string }[] } }[] };
 
 function json(data: unknown, status = 200): Response {
   return Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
@@ -106,6 +121,24 @@ async function queryLinearDocuments(accessToken: string): Promise<RawDocuments> 
   return payload.data.documents;
 }
 
+async function queryLinearIssueDetails(accessToken: string): Promise<RawIssueDetails> {
+  const response = await fetch(GRAPHQL_URL, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ query: ISSUE_DETAILS_QUERY }),
+  });
+  let payload: { data?: { issues?: RawIssueDetails }; errors?: { message?: string }[] };
+  try {
+    payload = await response.json() as { data?: { issues?: RawIssueDetails }; errors?: { message?: string }[] };
+  } catch {
+    throw new Error("Linear issue details request failed");
+  }
+  if (!response.ok || payload.errors?.length || !payload.data?.issues) {
+    throw new Error("Linear issue details request failed");
+  }
+  return payload.data.issues;
+}
+
 export async function onRequestGet({ request, env }: { request: Request; env: GityEnv }): Promise<Response> {
   if (!(await getSession(request, env))) return json({ error: "unauthorized" }, 401);
   const context = await getLinearSessionContext(request, env);
@@ -134,11 +167,28 @@ export async function onRequestGet({ request, env }: { request: Request; env: Gi
   } catch {
     console.warn("[gity-linear] Documents unavailable; continuing without documents");
   }
+  let issueDetails: RawIssueDetails = { nodes: [] };
+  try {
+    issueDetails = await queryLinearIssueDetails(accessToken);
+  } catch {
+    console.warn("[gity-linear] Issue details unavailable; continuing with core issue data");
+  }
+  const detailsById = new Map(issueDetails.nodes.map((issue) => [issue.id, issue]));
   return json({
     viewer: data.viewer ?? null,
     teams: data.teams?.nodes ?? [],
     projects: (data.projects?.nodes ?? []).map((project) => ({ ...project, state: project.status })),
-    issues: data.issues?.nodes ?? [],
+    issues: (data.issues?.nodes ?? []).map((issue) => {
+      const details = detailsById.get(issue.id);
+      return {
+        ...issue,
+        priority: details?.priority ?? 0,
+        dueDate: details?.dueDate ?? null,
+        estimate: details?.estimate ?? null,
+        cycle: details?.cycle ?? null,
+        labels: details?.labels?.nodes ?? [],
+      };
+    }),
     documents: documents.nodes,
     fetchedAt: Date.now(),
   });

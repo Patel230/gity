@@ -26,6 +26,14 @@ function statusColor(name: string): string {
   return "#8b7cf6";
 }
 
+function priorityName(priority: number): string {
+  return ({ 1: "Urgent", 2: "High", 3: "Medium", 4: "Low" } as Record<number, string>)[priority] ?? "No priority";
+}
+
+function priorityColor(name: string): string {
+  return ({ Urgent: "#f04848", High: "#e07a9a", Medium: "#dbc66f", Low: "#5aa9e6", "No priority": "#8b7cf6" } as Record<string, string>)[name] ?? "#8b7cf6";
+}
+
 function groupedCounts(values: string[], limit = 7): CountDatum[] {
   const counts = new Map<string, number>();
   values.forEach((value) => counts.set(value, (counts.get(value) ?? 0) + 1));
@@ -85,6 +93,7 @@ export function LinearAnalytics({ issues, projects }: { issues: LinearIssue[]; p
   const assignees = groupedCounts(issues.map((issue) => issue.assignee?.name ?? "Unassigned")).map((entry, index) => ({ ...entry, color: chartColors[index % chartColors.length] }));
   const teams = groupedCounts(issues.map((issue) => issue.team?.key ?? "No team")).map((entry, index) => ({ ...entry, color: chartColors[(index + 2) % chartColors.length] }));
   const projectStatuses = groupedCounts(projects.map((project) => project.state?.name ?? "No status")).map((entry) => ({ ...entry, color: statusColor(entry.name) }));
+  const priorities = groupedCounts(issues.map((issue) => priorityName(issue.priority ?? 0))).map((entry) => ({ ...entry, color: priorityColor(entry.name) }));
 
   return (
     <section className="space-y-2" aria-label="Linear analytics">
@@ -111,6 +120,10 @@ export function LinearAnalytics({ issues, projects }: { issues: LinearIssue[]; p
         <div className="rounded-md border border-border bg-card text-card-foreground" data-card-accent="18">
           <div className="px-4 pt-3.5"><h3 className="text-sm font-semibold">Projects by status</h3><p className="text-xs text-muted-foreground">Portfolio status across visible projects</p></div>
           <div className="px-4 pb-4 pt-3"><HorizontalBars data={projectStatuses} /></div>
+        </div>
+        <div className="rounded-md border border-border bg-card text-card-foreground" data-card-accent="19">
+          <div className="px-4 pt-3.5"><h3 className="text-sm font-semibold">Issues by priority</h3><p className="text-xs text-muted-foreground">Urgency across the current issue set</p></div>
+          <div className="px-4 pb-4 pt-3"><HorizontalBars data={priorities} /></div>
         </div>
       </div>
     </section>
