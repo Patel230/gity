@@ -10,15 +10,17 @@ const tooltipStyle = {
   fontSize: 12,
 } as const;
 
-const chartColors = ["var(--primary)", "var(--success)", "var(--warning)", "#8b7cf6", "#5aa9e6", "#e07a9a", "#78c091", "#c59bdb"];
+// Recharts paints SVG attributes. Keep these as concrete colors so the fills
+// remain visible in every browser and in exported screenshots.
+const chartColors = ["#dbc66f", "#7dd3a8", "#8b7cf6", "#5aa9e6", "#e07a9a", "#78c091", "#c084fc", "#f59e0b"];
 
 type CountDatum = { name: string; count: number; color?: string | null };
 
 function statusColor(name: string): string {
   const normalized = name.toLowerCase().replace(/[\s_-]+/g, "");
-  if (["done", "completed", "complete", "resolved"].includes(normalized)) return "var(--success)";
-  if (["canceled", "cancelled", "closed", "duplicate"].includes(normalized)) return "var(--destructive)";
-  if (["inprogress", "started", "active"].includes(normalized)) return "var(--warning)";
+  if (["done", "completed", "complete", "resolved"].includes(normalized)) return "#7dd3a8";
+  if (["canceled", "cancelled", "closed", "duplicate"].includes(normalized)) return "#f04848";
+  if (["inprogress", "started", "active"].includes(normalized)) return "#dbc66f";
   if (["planned", "triage", "todo"].includes(normalized)) return "#5aa9e6";
   if (["paused", "blocked"].includes(normalized)) return "#e07a9a";
   return "#8b7cf6";
@@ -79,7 +81,7 @@ function IssueStatusChart({ data }: { data: CountDatum[] }) {
 
 export function LinearAnalytics({ issues, projects }: { issues: LinearIssue[]; projects: LinearProject[] }) {
   const statuses = [...new Map(issues.map((issue) => [issue.state?.name ?? "No status", issue.state?.color])).entries()]
-    .map(([name, color]) => ({ name, count: issues.filter((issue) => (issue.state?.name ?? "No status") === name).length, color: color || statusColor(name) }));
+    .map(([name, color]) => ({ name, count: issues.filter((issue) => (issue.state?.name ?? "No status") === name).length, color: color?.startsWith("#") ? color : statusColor(name) }));
   const assignees = groupedCounts(issues.map((issue) => issue.assignee?.name ?? "Unassigned")).map((entry, index) => ({ ...entry, color: chartColors[index % chartColors.length] }));
   const teams = groupedCounts(issues.map((issue) => issue.team?.key ?? "No team")).map((entry, index) => ({ ...entry, color: chartColors[(index + 2) % chartColors.length] }));
   const projectStatuses = groupedCounts(projects.map((project) => project.state?.name ?? "No status")).map((entry) => ({ ...entry, color: statusColor(entry.name) }));
