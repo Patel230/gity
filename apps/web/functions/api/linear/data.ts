@@ -57,12 +57,24 @@ async function refreshToken(env: GityEnv, userId: string, refresh: string): Prom
 }
 
 async function queryLinear(accessToken: string): Promise<RawData> {
-  const response = await fetch(GRAPHQL_URL, {
-    method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ query: LINEAR_QUERY }),
-  });
-  const payload = await response.json() as { data?: RawData; errors?: { message?: string }[] };
+  let response: Response;
+  try {
+    response = await fetch(GRAPHQL_URL, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ query: LINEAR_QUERY }),
+    });
+  } catch (error) {
+    console.error("[gity-linear] GraphQL fetch failed", error instanceof Error ? error.message : "unknown error");
+    throw new Error("Linear data request failed");
+  }
+  let payload: { data?: RawData; errors?: { message?: string }[] };
+  try {
+    payload = await response.json() as { data?: RawData; errors?: { message?: string }[] };
+  } catch {
+    console.error("[gity-linear] GraphQL response was not JSON", response.status);
+    throw new Error("Linear data request failed");
+  }
   if (!response.ok || payload.errors?.length || !payload.data) {
     console.error("[gity-linear] GraphQL request failed", response.status, JSON.stringify(payload.errors ?? []).slice(0, 1200));
     throw new Error("Linear data request failed");
