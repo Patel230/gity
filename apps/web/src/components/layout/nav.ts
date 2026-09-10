@@ -9,11 +9,13 @@ import {
   Database,
   Settings,
   Bot,
+  Network,
 } from "lucide-react";
 
 export const NAV = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/organizations", label: "Orgs", icon: Building2 },
+  { href: "/graph", label: "Graph", icon: Network },
   { href: "/repositories", label: "Repos", icon: Database },
   { href: "/pull-requests", label: "PRs", icon: GitPullRequest },
   { href: "/issues", label: "Issues", icon: CircleDot },
