@@ -62,10 +62,10 @@ function IssueStatusChart({ data }: { data: CountDatum[] }) {
   if (!data.length) return <ChartEmpty />;
   return (
     <div className="space-y-1">
-      <div className="h-32">
+      <div className="h-36">
         <ResponsiveContainer width="100%" height="100%">
         <PieChart>
-          <Pie data={data} dataKey="count" nameKey="name" cx="50%" cy="50%" innerRadius={46} outerRadius={72} paddingAngle={2} stroke="var(--card)" strokeWidth={2}>
+          <Pie data={data} dataKey="count" nameKey="name" cx="50%" cy="50%" innerRadius={35} outerRadius={56} paddingAngle={2} stroke="var(--card)" strokeWidth={2}>
             {data.map((entry, index) => <Cell key={entry.name} fill={entry.color || chartColors[index % chartColors.length]} />)}
           </Pie>
           <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "var(--foreground)" }} />
