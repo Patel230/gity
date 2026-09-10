@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { LogOut, Menu, Moon, Sun, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, LogOut, Menu, Moon, Sun, X } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth, useViewerUser } from "@/lib/auth";
@@ -21,6 +21,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { token, serverSession, ready, setToken } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem("gity.sidebar-collapsed");
+      // Intentional browser-storage hydration after SSR.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSidebarCollapsed(stored === "true");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((collapsed) => {
+      const next = !collapsed;
+      try {
+        window.localStorage.setItem("gity.sidebar-collapsed", String(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   if (pathname?.startsWith("/auth/callback")) {
     return <>{children}</>;
@@ -36,15 +60,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-border/70 bg-card/55 backdrop-blur-xl lg:flex">
-        <SidebarBody onNavigate={() => {}} />
+      <aside className={cn("sticky top-0 hidden h-screen shrink-0 flex-col border-r border-border/70 bg-card/55 backdrop-blur-xl transition-[width] duration-200 lg:flex", sidebarCollapsed ? "w-[72px]" : "w-56")}>
+        <SidebarBody collapsed={sidebarCollapsed} onToggle={toggleSidebar} onNavigate={() => {}} />
       </aside>
       {/* Mobile drawer */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-black/60" onClick={() => setSidebarOpen(false)} />
           <aside className="absolute left-0 top-0 flex h-full w-60 flex-col border-r border-border bg-card">
-            <SidebarBody onNavigate={() => setSidebarOpen(false)} />
+            <SidebarBody onNavigate={() => setSidebarOpen(false)} showToggle={false} />
           </aside>
         </div>
       )}
@@ -60,11 +84,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function SidebarBody({ onNavigate }: { onNavigate: () => void }) {
+function SidebarBody({ collapsed = false, onToggle, onNavigate, showToggle = true }: { collapsed?: boolean; onToggle?: () => void; onNavigate: () => void; showToggle?: boolean }) {
   const pathname = usePathname();
   return (
     <>
-      <div className="px-4 pb-3 pt-4"><BrandLogo /></div>
+      <div className={cn("flex items-center pb-3 pt-4", collapsed ? "justify-center px-2" : "justify-between px-4")}>
+        <BrandLogo showName={!collapsed} />
+        {showToggle ? <Button size="icon" variant="ghost" onClick={onToggle} title={collapsed ? "Expand sidebar" : "Collapse sidebar"} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>{collapsed ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}</Button> : null}
+      </div>
       <nav className="flex-1 space-y-0.5 overflow-auto px-2">
         {NAV.map((item) => {
           const active =
@@ -74,13 +101,16 @@ function SidebarBody({ onNavigate }: { onNavigate: () => void }) {
               key={item.href}
               href={item.href}
               onClick={onNavigate}
+              title={collapsed ? item.label : undefined}
+              aria-label={item.label}
               className={cn(
-                "group flex items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-[13px] text-muted-foreground hover:bg-accent/70 hover:text-foreground",
+                "group flex items-center rounded-xl py-2.5 text-[13px] text-muted-foreground hover:bg-accent/70 hover:text-foreground",
+                collapsed ? "justify-center px-2.5" : "gap-2.5 px-2.5",
                 active && "nav-active mx-1 gap-3.5 rounded-[20px] bg-[color-mix(in_srgb,var(--primary)_15%,transparent)] px-4 py-4 text-[15px] font-medium text-foreground",
               )}
             >
               <item.icon className={cn(active ? "size-5" : "size-4", "shrink-0", active ? "text-[var(--primary)]" : "group-hover:text-[var(--primary)]")} />
-              {item.label}
+              {!collapsed ? item.label : null}
             </Link>
           );
         })}
