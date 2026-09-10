@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TD, TH, THead, TR, Table } from "@/components/ui/table";
-import { EmptyState, ErrorState } from "@/components/common/error-state";
+import { CachedDataNotice, EmptyState, ErrorState } from "@/components/common/error-state";
 import { PageHead } from "@/components/layout/page-head";
 import { useIssues } from "@/features/pull-requests/use-prs-issues";
 import { ageInDays, timeAgo } from "@/lib/utils";
@@ -17,7 +18,8 @@ import { ageInDays, timeAgo } from "@/lib/utils";
 type Tab = "open" | "closed" | "stale" | "mine" | "all";
 
 export default function IssuesPage() {
-  const { issues, isLoading, error } = useIssues();
+  const { issues, isLoading, isRefreshing, error, dataUpdatedAt } = useIssues();
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("open");
   const [org, setOrg] = useState("all");
   const [assignee, setAssignee] = useState("all");
@@ -60,7 +62,11 @@ export default function IssuesPage() {
     [issues],
   );
 
-  if (isLoading) {
+  const retry = () => {
+    void queryClient.invalidateQueries({ queryKey: ["gity"] });
+  };
+
+  if (isLoading && issues.length === 0) {
     return (
       <div className="space-y-4">
         <PageHead title="Issues" sub="Loading…" />
@@ -69,10 +75,13 @@ export default function IssuesPage() {
       </div>
     );
   }
-  if (error) return <ErrorState error={error} />;
+  if (error && issues.length === 0) return <ErrorState error={error} onRetry={retry} />;
 
   return (
     <div className="space-y-3">
+      {(isRefreshing || error) && issues.length > 0 ? (
+        <CachedDataNotice error={error} dataUpdatedAt={dataUpdatedAt} onRetry={retry} />
+      ) : null}
       <PageHead title="Issues" sub={`${rows.length} of ${issues.length} issues · pull requests are never counted here`} />
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
         <TabsList>

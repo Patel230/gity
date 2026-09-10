@@ -6,18 +6,19 @@
 const GITHUB_HOST = "api.github.com";
 
 export async function onRequest({ request }: { request: Request }): Promise<Response> {
+  const startedAt = Date.now();
   const incoming = new URL(request.url);
   const targetValue = incoming.searchParams.get("url");
-  if (!targetValue) return Response.json({ error: "missing_url" }, { status: 400 });
+  if (!targetValue) return relayError("missing_url", 400);
 
   let target: URL;
   try {
     target = new URL(targetValue);
   } catch {
-    return Response.json({ error: "invalid_url" }, { status: 400 });
+    return relayError("invalid_url", 400);
   }
   if (target.protocol !== "https:" || target.hostname !== GITHUB_HOST) {
-    return Response.json({ error: "upstream_not_allowed" }, { status: 400 });
+    return relayError("upstream_not_allowed", 400);
   }
 
   // Rebuild the upstream request instead of forwarding browser/Cloudflare
@@ -41,12 +42,14 @@ export async function onRequest({ request }: { request: Request }): Promise<Resp
     try {
       body = await request.arrayBuffer();
     } catch {
-      return Response.json({ error: "bad_request" }, { status: 400 });
+      return relayError("bad_request", 400);
     }
   }
 
   let upstream: Response | undefined;
+  let attempts = 0;
   for (let attempt = 0; attempt < 3; attempt++) {
+    attempts = attempt + 1;
     try {
       upstream = await fetch(target, {
         method: request.method,
@@ -58,13 +61,52 @@ export async function onRequest({ request }: { request: Request }): Promise<Resp
       // dashboard loads. Retry those responses before exposing a failure.
       await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
     } catch {
-      if (attempt === 2) return Response.json({ error: "upstream_unreachable" }, { status: 502 });
+      if (attempt === 2) {
+        console.warn("[gity-relay] upstream unreachable", {
+          method: request.method,
+          path: target.pathname,
+          attempts,
+        });
+        return relayError("upstream_unreachable", 502, attempts, startedAt);
+      }
     }
   }
-  if (!upstream) return Response.json({ error: "upstream_unreachable" }, { status: 502 });
+  if (!upstream) return relayError("upstream_unreachable", 502, attempts, startedAt);
+
+  if (!upstream.ok) {
+    console.warn("[gity-relay] upstream failure", {
+      method: request.method,
+      path: target.pathname,
+      status: upstream.status,
+      attempts,
+    });
+  }
 
   const responseHeaders = new Headers(upstream.headers);
   responseHeaders.delete("set-cookie");
   responseHeaders.set("Cache-Control", "no-store");
+  responseHeaders.set("X-Gity-Relay", "github");
+  responseHeaders.set("X-Gity-Relay-Attempts", String(attempts));
+  responseHeaders.set("Server-Timing", `github-relay;dur=${Date.now() - startedAt}`);
   return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
+}
+
+function relayError(
+  error: string,
+  status: number,
+  attempts = 0,
+  startedAt = Date.now(),
+): Response {
+  return Response.json(
+    { error },
+    {
+      status,
+      headers: {
+        "Cache-Control": "no-store",
+        "X-Gity-Relay": "error",
+        "X-Gity-Relay-Attempts": String(attempts),
+        "Server-Timing": `github-relay;dur=${Date.now() - startedAt}`,
+      },
+    },
+  );
 }

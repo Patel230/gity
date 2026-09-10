@@ -21,6 +21,38 @@ export function EmptyState({
   );
 }
 
+export function CachedDataNotice({
+  error,
+  dataUpdatedAt,
+  onRetry,
+}: {
+  error?: Error | null;
+  dataUpdatedAt?: number;
+  onRetry?: () => void;
+}) {
+  const updated = dataUpdatedAt ? ` Last updated ${timeAgo(new Date(dataUpdatedAt).toISOString())}.` : "";
+  return (
+    <Card
+      accent={3}
+      role="status"
+      className="flex flex-wrap items-center justify-between gap-2 border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] bg-[color-mix(in_srgb,var(--warning)_6%,transparent)] px-3 py-2"
+    >
+      <p className="text-xs text-muted-foreground">
+        <span className="font-medium text-foreground">{error ? "Using cached data" : "Updating data"}</span>
+        {error
+          ? " — GitHub refresh failed; the last successful results remain visible."
+          : " — the latest GitHub results are arriving in the background."}
+        {updated}
+      </p>
+      {onRetry ? (
+        <Button size="sm" variant="secondary" onClick={onRetry}>
+          <Timer className="size-3.5" /> Retry
+        </Button>
+      ) : null}
+    </Card>
+  );
+}
+
 export function ErrorState({
   error,
   onRetry,

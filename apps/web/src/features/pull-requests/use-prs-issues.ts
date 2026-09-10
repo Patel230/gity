@@ -3,19 +3,15 @@
 import { useAuth, useViewerUser } from "@/lib/auth";
 import {
   allIssuesOptions,
+  allPrsOptions,
   ciStatesOptions,
   prCiStatesOptions,
   fetchIssueDelta,
   fetchPrDelta,
-  mergedPrsOptions,
-  openPrsOptions,
   reposOptions,
 } from "@/lib/github/queries";
 import type { GithubIssue, GithubPullRequest } from "@/lib/github/types";
 import { useDeltaSearch, useLiveQuery } from "../use-github";
-
-const isOpenPr = (p: GithubPullRequest) => p.state === "open" || p.state === "draft";
-const isMergedPr = (p: GithubPullRequest) => p.state === "merged" || p.state === "closed";
 
 export function usePullRequests() {
   const { token, fingerprint: fp } = useAuth();
@@ -23,34 +19,26 @@ export function usePullRequests() {
   const login = viewer.data?.login;
   const reposQ = useLiveQuery({ ...reposOptions(token, fp) });
   const ciQ = useLiveQuery({ ...ciStatesOptions(token, fp, reposQ.data) });
-  const openQ = useDeltaSearch<GithubPullRequest>(
-    { ...openPrsOptions(token, fp, login, reposQ.data) },
-    "prs-open",
+  const prsQ = useDeltaSearch<GithubPullRequest>(
+    { ...allPrsOptions(token, fp, login) },
+    "prs",
     (since) => fetchPrDelta(token!, login!, since),
-    (all) => all.filter(isOpenPr),
-  );
-  const mergedQ = useDeltaSearch<GithubPullRequest>(
-    { ...mergedPrsOptions(token, fp, login) },
-    "prs-merged",
-    (since) => fetchPrDelta(token!, login!, since),
-    (all) => all.filter(isMergedPr),
+    (all) => all,
   );
 
-  const prs = [...(openQ.data ?? []), ...(mergedQ.data ?? [])];
-  const seen = new Set<string>();
-  const deduped = prs.filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
-  const sorted = deduped.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const sorted = [...(prsQ.data ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const prCiQ = useLiveQuery({ ...prCiStatesOptions(token, fp, sorted) });
 
   return {
     prs: sorted,
-    openCount: openQ.data?.length ?? 0,
+    openCount: sorted.filter((p) => p.state === "open" || p.state === "draft").length,
     repos: reposQ.data ?? [],
     ciStates: ciQ.data ?? {},
     prCiStates: prCiQ.data ?? {},
-    isLoading: openQ.isLoading || mergedQ.isLoading,
-    error: (openQ.error ?? mergedQ.error) as Error | null,
-    dataUpdatedAt: Math.max(openQ.dataUpdatedAt, mergedQ.dataUpdatedAt),
+    isLoading: prsQ.isLoading,
+    isRefreshing: reposQ.isFetching || prsQ.isFetching || ciQ.isFetching || prCiQ.isFetching,
+    error: (prsQ.error ?? reposQ.error) as Error | null,
+    dataUpdatedAt: Math.max(prsQ.dataUpdatedAt, reposQ.dataUpdatedAt),
   };
 }
 
@@ -70,7 +58,8 @@ export function useIssues() {
     issues: (issuesQ.data ?? []).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     repos: reposQ.data ?? [],
     isLoading: issuesQ.isLoading,
-    error: issuesQ.error as Error | null,
-    dataUpdatedAt: issuesQ.dataUpdatedAt,
+    isRefreshing: reposQ.isFetching || issuesQ.isFetching,
+    error: (issuesQ.error ?? reposQ.error) as Error | null,
+    dataUpdatedAt: Math.max(issuesQ.dataUpdatedAt, reposQ.dataUpdatedAt),
   };
 }

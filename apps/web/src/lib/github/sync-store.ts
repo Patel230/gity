@@ -3,11 +3,12 @@
  * first complete fetch we record WHEN it happened; later syncs fetch only
  * items updated since that day (`updated:>=YYYY-MM-DD`) and merge by id.
  * Day granularity (not timestamp) with id-merge makes same-day overlap
- * harmless. Manual Refresh clears markers to force a true full re-sync.
+ * harmless. Markers survive manual refreshes so a transient error never
+ * turns a normal retry into an expensive full-history scan.
  */
 "use client";
 
-export type SyncKind = "prs-open" | "prs-merged" | "issues";
+export type SyncKind = "prs" | "issues";
 
 const KEY = (kind: SyncKind) => `gity.sync.${kind}`;
 
@@ -31,8 +32,10 @@ export function setLastSync(kind: SyncKind, now: number = Date.now()): void {
 
 export function clearAllSync(): void {
   try {
-    for (const k of ["prs-open", "prs-merged", "issues"] as SyncKind[]) {
-      window.localStorage.removeItem(KEY(k));
+    // Remove pre-deduplication keys too, so old browser profiles do not retain
+    // misleading state after upgrading to the shared PR snapshot.
+    for (const key of ["gity.sync.prs", "gity.sync.prs-open", "gity.sync.prs-merged", "gity.sync.issues"]) {
+      window.localStorage.removeItem(key);
     }
   } catch {
     /* ignore */

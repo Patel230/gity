@@ -4,10 +4,11 @@
 
 Gity is an **open-source (MIT)** personal GitHub dashboard on the edge: a static
 Next.js frontend on **Cloudflare Pages** plus small **Pages Functions** for GitHub
-login, relay retries, and the optional protected read-only agent API. **GitHub itself
-is the source of truth**: the browser fetches data directly from the GitHub REST and
-GraphQL APIs. No database, no Redis, and no webhooks. Connect with GitHub and it
-works across your public and private repositories.
+login, resilient relay retries, health monitoring, and the optional protected
+read-only agent API. **GitHub itself is the source of truth**: the browser uses the
+GitHub REST and GraphQL APIs through a same-origin relay with a direct fallback.
+No database, no Redis, and no webhooks. Connect with GitHub and it works across your
+public and private repositories.
 
 ## Architecture
 
@@ -15,13 +16,14 @@ works across your public and private repositories.
 Browser / Gity (Cloudflare Pages, static)
    ├── GitHub GraphQL API  (nested repo / PR / issue / contribution data)
    ├── GitHub REST API     (search, Actions, events, token check)
-   └── Pages Functions ─┐  (login only: /api/config, /api/exchange, /api/refresh)
+   └── Pages Functions ─┐  (login, GitHub relay, and health probe)
                         │   holds client_secret server-side, stores nothing
                         ▼
                       GitHub
 ```
 
-- Data calls go browser → `api.github.com` directly. The token is only ever sent to GitHub.
+- Data calls prefer the same-origin Pages relay and fall back to `api.github.com` when a relay
+  gateway fails. The token is only ever sent to GitHub; the relay never stores or logs it.
 - Login codes are swapped for tokens in `functions/api/*` (same origin — no CORS involved).
 - UI components never make raw GitHub calls. All data flows through:
   - `src/lib/github/` — transport (`client.ts`), GraphQL docs (`graphql.ts`), typed REST
@@ -33,7 +35,7 @@ Browser / Gity (Cloudflare Pages, static)
 
 ## Stack
 
-Cloudflare Pages (hosting) + Pages Functions (login exchange) · Next.js (App Router,
+Cloudflare Pages (hosting) + Pages Functions (login exchange, relay, health) · Next.js (App Router,
 static export) · TypeScript (strict) · Tailwind CSS · shadcn-style UI · TanStack Query ·
 Recharts · Lucide icons. Dark mode first.
 
@@ -123,7 +125,8 @@ so true real-time is impossible for a frontend. Gity instead implements
 - **Calm tier** (repos, PRs, issues, CI, contributions): refreshes on page open,
   window focus/reconnect, and manual Refresh — never on the interval. A 30s poll
   on the repos query alone would burn the 5,000/hr GraphQL budget in minutes.
-- A manual **Refresh** button invalidates all queries; header shows `Updated Xs ago`.
+- A manual **Refresh** button invalidates all queries while preserving incremental-sync markers;
+  header shows `Updated Xs ago`.
 - Interval configurable in Settings: **Off / 15s / 30s / 60s / 5 min**.
 - Last session's data is cached in the browser, so revisits paint instantly and
   then quietly revalidate live from GitHub in the background.
@@ -171,12 +174,21 @@ We deliberately call this “Live Refresh”, never “real-time”, in the UI.
 - Protection strategy: TanStack Query caching + shared query keys (request deduplication),
   bounded per-repo fan-out (CI states, workflow runs), paginated-but-capped search windows,
   and polling that pauses when the tab is hidden.
-- PR/issue aggregation uses the issue-search index (`involves:`) plus detailed per-repo
-  fetches for the most active repos; the search index caps at ~1,000 results.
+- PR/issue aggregation uses the issue-search index (`involves:`), with one shared PR
+  snapshot powering both open and merged views; the search index caps at ~1,000 results.
 - **Incremental sync, not full search every time:** the first PR/issue listing fetches
   every page once and records a sync marker; later syncs fetch only items updated
-  since that day (`updated:>=YYYY-MM-DD`) and merge by id. The manual Refresh button
-  clears markers for a true full re-sync (heals deleted/transferred items).
+  since that day (`updated:>=YYYY-MM-DD`) and merge by id. A failed refresh keeps the
+  last successful snapshot visible and reports the error instead of pretending stale
+  data is current.
+
+## Operations and scale
+
+- `GET /api/health` is a no-store GitHub reachability probe suitable for an uptime monitor.
+- Relay responses expose `X-Gity-Relay-Attempts` and `Server-Timing`; upstream failures are
+  recorded in Cloudflare Pages function logs without tokens or query strings.
+- If usage grows beyond a personal dashboard, move OAuth/token handling and the relay to a
+  dedicated monitored Worker or backend with per-user rate limiting and centralized secrets.
 
 ## Gity Activity Streak
 
@@ -186,7 +198,7 @@ built from the contribution calendar overlaid with today's live events.
 
 ## Contributing
 
-PRs welcome. Keep it frontend-only: no backends, no proxies, no secrets in the bundle
+PRs welcome. Keep the UI static and keep secrets server-side: no database, no secrets in the bundle
 (except the public GitHub-App Client ID). Run `npx tsc --noEmit` and `npm run build`
 before pushing.
 

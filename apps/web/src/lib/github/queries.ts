@@ -13,7 +13,6 @@ import {
   fetchOrgs,
   fetchRepoCiState,
   fetchPullRequestCiState,
-  fetchRepoOpenPrs,
   fetchRepoWorkflowRuns,
   fetchSearchPrsAndIssues,
   fetchUserEvents,
@@ -21,10 +20,10 @@ import {
   searchIssuesRest,
   searchPrsRest,
 } from "./rest";
+import { GithubApiError } from "./types";
 import type {
   ActivityItem,
   ContributionDay,
-  GithubApiError,
   GithubIssue,
   GithubOrg,
   GithubPullRequest,
@@ -58,14 +57,12 @@ export const qk = {
   repos: (fp: string) => ["gity", fp, "repos"] as const,
   ciStates: (fp: string) => ["gity", fp, "ci-states"] as const,
   prCiStates: (fp: string) => ["gity", fp, "pr-ci-states"] as const,
-  // PR/issue/event keys include the login + repo signature so the first fetch
+  // PR/issue/event keys include the login so the first fetch
   // happens only when dependencies arrive (no stale empty cache), and refires
   // exactly once when they do. `depth` separates the fast head query used for
   // dashboard pulses from the full query used for complete listings.
-  openPrs: (fp: string, login = "", sig = "", depth: SearchDepth = "full") =>
-    ["gity", fp, "prs", "open", login, sig, depth] as const,
-  mergedPrs: (fp: string, login = "", depth: SearchDepth = "full") =>
-    ["gity", fp, "prs", "merged", login, depth] as const,
+  prsAll: (fp: string, login = "", depth: SearchDepth = "full") =>
+    ["gity", fp, "prs", "all", login, depth] as const,
   allIssues: (fp: string, login = "", depth: SearchDepth = "full") =>
     ["gity", fp, "issues", "all", login, depth] as const,
   workflowRuns: (fp: string) => ["gity", fp, "actions", "runs"] as const,
@@ -105,7 +102,11 @@ function searchQuery(kind: "pr" | "issue", login: string, depth: SearchDepth): s
  *   (~600 GraphQL points) would burn the 5,000/hr budget in minutes and stall
  *   the whole app on 429s. Spread CALM into a builder's options to opt out.
  */
-const CALM = { refetchInterval: false as const };
+const CALM = {
+  refetchInterval: false as const,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+};
 
 /**
  * Retry policy: transient failures (network hiccups, GitHub 5xx) get a second
@@ -203,7 +204,9 @@ export function prCiStatesOptions(
   fp: string,
   prs: GithubPullRequest[] | undefined,
 ) {
-  const targets = (prs ?? []).slice(0, 100);
+  // CI is enrichment, not a reason to hold the whole listing hostage. Keep
+  // the first screen useful while avoiding one GraphQL request per PR.
+  const targets = (prs ?? []).slice(0, 24);
   const ids = targets.map((p) => `${p.repoFullName}#${p.number}`).join(",");
   return queryOptions<Record<string, GithubRepo["ciState"]>, GithubApiError>({
     ...CALM,
@@ -228,75 +231,8 @@ export function prCiStatesOptions(
   });
 }
 
-/** Open PRs involving the viewer + detailed per-repo open PRs for top repos. */
-export function openPrsOptions(
-  token: string | null,
-  fp: string,
-  login: string | undefined,
-  repos: GithubRepo[] | undefined,
-  depth: SearchDepth = "full",
-) {
-  const top =
-    depth === "full"
-      ? (repos ?? [])
-          .filter((r) => r.openPrCount > 0 && !r.isArchived)
-          .sort((a, b) => b.openPrCount - a.openPrCount)
-          .slice(0, 12)
-      : [];
-  const sig = top.map((r) => r.fullName).join(",");
-  return queryOptions<GithubPullRequest[], GithubApiError>({
-    ...CALM,
-    queryKey: qk.openPrs(fp, login ?? "", sig, depth),
-    queryFn: async () => {
-      const byKey = new Map<string, GithubPullRequest>();
-      // 1) Everything involving the viewer (authored/assigned/mentioned).
-      if (login) {
-        try {
-          const { prs } = await fetchSearchPrsAndIssues(
-            token!,
-            searchQuery("pr", login, depth),
-            { maxPages: depthPages(depth) },
-          );
-          for (const pr of prs.filter(
-            (p) => p.state === "open" || p.state === "draft",
-          ))
-            byKey.set(pr.id, pr);
-        } catch {
-          /* fall through to per-repo fetch */
-        }
-      }
-      // 2) Detailed open PRs (with review decisions) for the most active repos.
-      const queue = [...top];
-      const workers = Array.from({ length: 5 }, async () => {
-        while (queue.length) {
-          const repo = queue.shift()!;
-          const [owner, name] = repo.fullName.split("/");
-          const prs = await fetchRepoOpenPrs(token!, owner, name);
-          for (const pr of prs) byKey.set(pr.id, pr);
-        }
-      });
-      await Promise.all(workers);
-      // 3) REST fallback if both came up empty but repos report open PRs.
-      if (byKey.size === 0 && login) {
-        const prs = await searchPrsRest(token!, `involves:${login}`, { maxPages: depthPages(depth) });
-        for (const pr of prs.filter(
-          (p) => p.state === "open" || p.state === "draft",
-        ))
-          byKey.set(pr.id, pr);
-      }
-      return [...byKey.values()].sort((a, b) =>
-        b.updatedAt.localeCompare(a.updatedAt),
-      );
-    },
-    enabled: !!token && !!login,
-    staleTime: 60_000,
-    gcTime: 10 * 60_000,
-    retry: (count, err) => retryPolicy(count, err),
-  });
-}
-
-/** Recently merged/closed PRs involving the viewer (powers merged-today/week stats). */
-export function mergedPrsOptions(
+/** All PRs involving the viewer. Open/merged consumers share this request. */
+export function allPrsOptions(
   token: string | null,
   fp: string,
   login: string | undefined,
@@ -304,7 +240,7 @@ export function mergedPrsOptions(
 ) {
   return queryOptions<GithubPullRequest[], GithubApiError>({
     ...CALM,
-    queryKey: qk.mergedPrs(fp, login ?? "", depth),
+    queryKey: qk.prsAll(fp, login ?? "", depth),
     queryFn: async () => {
       if (!login) return [];
       try {
@@ -313,10 +249,15 @@ export function mergedPrsOptions(
           searchQuery("pr", login, depth),
           { maxPages: depthPages(depth) },
         );
-        return prs.filter((p) => p.state === "merged" || p.state === "closed");
-      } catch {
-        const prs = await searchPrsRest(token!, `involves:${login}`, { maxPages: depthPages(depth) });
-        return prs.filter((p) => p.state === "merged" || p.state === "closed");
+        return prs;
+      } catch (error) {
+        if (
+          error instanceof GithubApiError &&
+          !["blocked", "server", "network"].includes(error.kind)
+        ) {
+          throw error;
+        }
+        return searchPrsRest(token!, `involves:${login}`, { maxPages: depthPages(depth) });
       }
     },
     enabled: !!token && !!login,
@@ -324,6 +265,35 @@ export function mergedPrsOptions(
     gcTime: 10 * 60_000,
     retry: (count, err) => retryPolicy(count, err),
   });
+}
+
+/** Open PRs derived from the shared PR search. */
+export function openPrsOptions(
+  token: string | null,
+  fp: string,
+  login: string | undefined,
+  _repos?: GithubRepo[],
+  depth: SearchDepth = "full",
+) {
+  return {
+    ...allPrsOptions(token, fp, login, depth),
+    select: (prs: GithubPullRequest[]) =>
+      prs.filter((p) => p.state === "open" || p.state === "draft"),
+  };
+}
+
+/** Merged/closed PRs derived from the shared PR search. */
+export function mergedPrsOptions(
+  token: string | null,
+  fp: string,
+  login: string | undefined,
+  depth: SearchDepth = "full",
+) {
+  return {
+    ...allPrsOptions(token, fp, login, depth),
+    select: (prs: GithubPullRequest[]) =>
+      prs.filter((p) => p.state === "merged" || p.state === "closed"),
+  };
 }
 
 /** Issues involving the viewer (PRs strictly excluded). */
@@ -345,7 +315,13 @@ export function allIssuesOptions(
           { maxPages: depthPages(depth) },
         );
         return issues;
-      } catch {
+      } catch (error) {
+        if (
+          error instanceof GithubApiError &&
+          !["blocked", "server", "network"].includes(error.kind)
+        ) {
+          throw error;
+        }
         return searchIssuesRest(token!, `involves:${login}`, { maxPages: depthPages(depth) });
       }
     },

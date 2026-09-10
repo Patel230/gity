@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { GithubApiError } from "@/lib/github/types";
+import type { GithubApiError } from "@/lib/github/types";
 import { getLastSync, setLastSync, type SyncKind } from "@/lib/github/sync-store";
 import { toYMD } from "@/lib/utils";
 import { usePrefs } from "@/lib/preferences";
@@ -40,9 +40,9 @@ export function mergeById<T extends { id: string }>(prev: T[], delta: T[]): T[] 
  * - First run ever (no snapshot or no marker): full fetch, marker recorded.
  * - Later runs: fetch only items updated since the marker day, merge by id,
  *   apply the bucket filter. One fast page instead of up to ten slow ones.
- * - Delta failure keeps the snapshot (except auth/permission errors, which
- *   rethrow so the UI can demand a fresh token). Manual Refresh clears
- *   markers elsewhere, forcing the next run back to full.
+ * - Delta failure keeps the last successful snapshot in React Query while
+ *   preserving the error state, so the UI can warn users instead of showing
+ *   stale data as healthy. Manual refresh remains incremental.
  */
 export function useDeltaSearch<T extends { id: string }>(
   options: Parameters<typeof useLiveQuery<T[]>>[0],
@@ -63,13 +63,7 @@ export function useDeltaSearch<T extends { id: string }>(
         setLastSync(kind);
         return full;
       }
-      let delta: T[];
-      try {
-        delta = await fetchDelta(toYMD(new Date(since)));
-      } catch (e) {
-        if (e instanceof GithubApiError && (e.kind === "auth" || e.kind === "forbidden")) throw e;
-        return prev;
-      }
+      const delta = await fetchDelta(toYMD(new Date(since)));
       setLastSync(kind);
       return select(mergeById(prev, delta));
     },

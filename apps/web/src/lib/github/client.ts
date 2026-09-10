@@ -8,6 +8,7 @@
 import { recordGraphqlRateLimit, recordRestRateLimit } from "./rate-limit";
 import { GithubApiError } from "./types";
 import { parseLinkHeader, toGithubError } from "./pagination";
+import { fetchWithGatewayFallback } from "./transport";
 
 export const REST_BASE = "https://api.github.com";
 export const GRAPHQL_URL = "https://api.github.com/graphql";
@@ -37,36 +38,27 @@ async function readErrorMessage(res: Response): Promise<string> {
 }
 
 async function proxyFetch(url: string, init: RequestInit): Promise<Response> {
-  return fetch(`/api/github?url=${encodeURIComponent(url)}`, init);
+  return fetchWithTimeout(`/api/github?url=${encodeURIComponent(url)}`, init);
 }
 
-function isGatewayError(status: number): boolean {
-  return status === 502 || status === 503 || status === 504;
-}
+const GITHUB_REQUEST_TIMEOUT_MS = 15_000;
 
-/**
- * A relay can return an HTTP gateway error even when the browser can reach
- * GitHub. Try the other transport in that case, while preserving real GitHub
- * responses such as 401/403 for the normal error classifier.
- */
-async function fetchWithGatewayFallback(
-  primary: () => Promise<Response>,
-  fallback: () => Promise<Response>,
+function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init?: RequestInit,
 ): Promise<Response> {
-  let response: Response;
-  try {
-    response = await primary();
-  } catch {
-    return fallback();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), GITHUB_REQUEST_TIMEOUT_MS);
+  const callerSignal = init?.signal;
+  const abortFromCaller = () => controller.abort();
+  if (callerSignal) {
+    if (callerSignal.aborted) controller.abort();
+    else callerSignal.addEventListener("abort", abortFromCaller, { once: true });
   }
-  if (!isGatewayError(response.status)) return response;
-
-  try {
-    const fallbackResponse = await fallback();
-    return isGatewayError(fallbackResponse.status) ? response : fallbackResponse;
-  } catch {
-    return response;
-  }
+  return fetch(input, { ...init, signal: controller.signal }).finally(() => {
+    clearTimeout(timer);
+    callerSignal?.removeEventListener("abort", abortFromCaller);
+  });
 }
 
 function classifyRestError(res: Response, message: string): GithubApiError {
@@ -119,7 +111,7 @@ export async function restFetch<T>(
   };
   try {
     res = await fetchWithGatewayFallback(
-      () => fetch(url.toString(), requestInit),
+      () => fetchWithTimeout(url.toString(), requestInit),
       () => proxyFetch(url.toString(), requestInit),
     );
   } catch {
@@ -197,7 +189,7 @@ export async function graphqlFetch<T>(
     // failed cross-origin request on every page load.
     res = await fetchWithGatewayFallback(
       () => proxyFetch(GRAPHQL_URL, requestInit),
-      () => fetch(GRAPHQL_URL, requestInit),
+      () => fetchWithTimeout(GRAPHQL_URL, requestInit),
     );
   } catch {
     throw new GithubApiError(
