@@ -2,7 +2,7 @@
  * Low-level GitHub transport.
  * - Browser → api.github.com by default, with a same-origin relay fallback
  *   when a local network blocker prevents direct access.
- * - Token is passed in per call (never read from env).
+ * - PATs are passed in per call; server sessions use same-origin cookies.
  * - Maps failures to GithubApiError and records rate limits.
  */
 import { recordGraphqlRateLimit, recordRestRateLimit } from "./rate-limit";
@@ -13,12 +13,13 @@ import { fetchWithGatewayFallback } from "./transport";
 export const REST_BASE = "https://api.github.com";
 export const GRAPHQL_URL = "https://api.github.com/graphql";
 
-function authHeaders(token: string): Record<string, string> {
-  return {
+function authHeaders(token: string | null): Record<string, string> {
+  const headers: Record<string, string> = {
     Accept: "application/vnd.github+json",
-    Authorization: `Bearer ${token}`,
     "X-GitHub-Api-Version": "2022-11-28",
   };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
 }
 
 async function readErrorMessage(res: Response): Promise<string> {
@@ -94,7 +95,7 @@ function classifyRestError(res: Response, message: string): GithubApiError {
 
 /** Single REST request returning parsed JSON. */
 export async function restFetch<T>(
-  token: string,
+  token: string | null,
   path: string,
   init?: RequestInit & { query?: Record<string, string | number | undefined> },
 ): Promise<{ data: T; headers: Headers }> {
@@ -110,10 +111,12 @@ export async function restFetch<T>(
     headers: { ...authHeaders(token), ...(init?.headers ?? {}) },
   };
   try {
-    res = await fetchWithGatewayFallback(
-      () => fetchWithTimeout(url.toString(), requestInit),
-      () => proxyFetch(url.toString(), requestInit),
-    );
+    res = token
+      ? await fetchWithGatewayFallback(
+          () => fetchWithTimeout(url.toString(), requestInit),
+          () => proxyFetch(url.toString(), requestInit),
+        )
+      : await proxyFetch(url.toString(), requestInit);
   } catch {
     throw new GithubApiError(
       "blocked",
@@ -128,7 +131,7 @@ export async function restFetch<T>(
 
 /** Fetch every page of a paginated REST endpoint (follows Link headers). */
 export async function restFetchAll<T>(
-  token: string,
+  token: string | null,
   path: string,
   opts?: {
     query?: Record<string, string | number | undefined>;
@@ -170,7 +173,7 @@ export interface GraphqlResponse<T> {
 
 /** Single GraphQL request. */
 export async function graphqlFetch<T>(
-  token: string,
+  token: string | null,
   query: string,
   variables?: Record<string, unknown>,
 ): Promise<T> {
@@ -184,13 +187,14 @@ export async function graphqlFetch<T>(
     body: JSON.stringify({ query, variables }),
   };
   try {
-    // GitHub's GraphQL endpoint does not reliably expose CORS headers for
-    // browser requests. Use our same-origin relay first to avoid a noisy,
-    // failed cross-origin request on every page load.
-    res = await fetchWithGatewayFallback(
-      () => proxyFetch(GRAPHQL_URL, requestInit),
-      () => fetchWithTimeout(GRAPHQL_URL, requestInit),
-    );
+    // Server sessions must stay same-origin; PAT compatibility requests can
+    // still use the direct path and fall back to the relay when blocked.
+    res = token
+      ? await fetchWithGatewayFallback(
+          () => proxyFetch(GRAPHQL_URL, requestInit),
+          () => fetchWithTimeout(GRAPHQL_URL, requestInit),
+        )
+      : await proxyFetch(GRAPHQL_URL, requestInit);
   } catch {
     throw new GithubApiError(
       "blocked",

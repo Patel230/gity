@@ -1,11 +1,27 @@
 /**
  * Same-origin GitHub relay used only when a browser/network blocks direct
- * calls to api.github.com. The token is forwarded for one request and never
- * stored or logged by this function.
+ * calls to api.github.com. PATs are forwarded for one request; OAuth sessions
+ * are decrypted server-side and never exposed to the browser or logs.
  */
+import {
+  cacheKey,
+  getCachedGithubResponse,
+  putCachedGithubResponse,
+} from "../lib/cache";
+import type { GityEnv } from "../lib/env";
+import { getSession, isSameOrigin } from "../lib/session";
+
 const GITHUB_HOST = "api.github.com";
 
-export async function onRequest({ request }: { request: Request }): Promise<Response> {
+export async function onRequest({
+  request,
+  env,
+  waitUntil,
+}: {
+  request: Request;
+  env: GityEnv;
+  waitUntil?: (promise: Promise<unknown>) => void;
+}): Promise<Response> {
   const startedAt = Date.now();
   const incoming = new URL(request.url);
   const targetValue = incoming.searchParams.get("url");
@@ -21,6 +37,24 @@ export async function onRequest({ request }: { request: Request }): Promise<Resp
     return relayError("upstream_not_allowed", 400);
   }
 
+  const explicitAuthorization = request.headers.get("authorization");
+  let session = null;
+  if (!explicitAuthorization) {
+    if (!isSameOrigin(request)) return relayError("cross_origin_request", 403);
+    if (request.method === "POST" && target.pathname !== "/graphql") {
+      return relayError("method_not_allowed", 405);
+    }
+    try {
+      session = await getSession(request, env);
+    } catch {
+      console.error("[gity-relay] session lookup failed");
+    }
+    if (!session) return relayError("unauthorized", 401, 0, startedAt);
+    if (session.expiresAt !== null && session.expiresAt <= Date.now()) {
+      return relayError("session_expired", 401, 0, startedAt);
+    }
+  }
+
   // Rebuild the upstream request instead of forwarding browser/Cloudflare
   // metadata (Origin, Referer, content-length, sec-fetch-*, etc.). Those
   // headers are not useful to GitHub and can make a streamed POST fail.
@@ -29,9 +63,9 @@ export async function onRequest({ request }: { request: Request }): Promise<Resp
     "X-GitHub-Api-Version": "2022-11-28",
     "User-Agent": "Gity-GitHub-Relay",
   });
-  const authorization = request.headers.get("authorization");
   const contentType = request.headers.get("content-type");
-  if (authorization) headers.set("Authorization", authorization);
+  if (explicitAuthorization) headers.set("Authorization", explicitAuthorization);
+  else if (session) headers.set("Authorization", "Bearer " + session.accessToken);
   if (contentType) headers.set("Content-Type", contentType);
   else if (request.method !== "GET" && request.method !== "HEAD") {
     headers.set("Content-Type", "application/json");
@@ -43,6 +77,35 @@ export async function onRequest({ request }: { request: Request }): Promise<Resp
       body = await request.arrayBuffer();
     } catch {
       return relayError("bad_request", 400);
+    }
+  }
+
+  const key = session ? await cacheKey(target.toString(), body) : null;
+  if (key && session) {
+    try {
+      const cached = await getCachedGithubResponse(env, session, key);
+      if (cached) {
+        const cachedHeaders = new Headers({
+          "Cache-Control": "no-store",
+          "Content-Type": cached.contentType,
+          "X-Gity-Cache": "hit",
+          "X-Gity-Relay": "github",
+          "X-Gity-Relay-Attempts": "0",
+          "Server-Timing": "github-cache;dur=0",
+        });
+        if (cached.rateLimitRemaining) {
+          cachedHeaders.set("X-RateLimit-Remaining", cached.rateLimitRemaining);
+        }
+        if (cached.rateLimitReset) {
+          cachedHeaders.set("X-RateLimit-Reset", cached.rateLimitReset);
+        }
+        return new Response(cached.body, {
+          status: cached.status,
+          headers: cachedHeaders,
+        });
+      }
+    } catch {
+      console.warn("[gity-relay] cache read failed");
     }
   }
 
@@ -88,7 +151,24 @@ export async function onRequest({ request }: { request: Request }): Promise<Resp
   responseHeaders.set("X-Gity-Relay", "github");
   responseHeaders.set("X-Gity-Relay-Attempts", String(attempts));
   responseHeaders.set("Server-Timing", `github-relay;dur=${Date.now() - startedAt}`);
-  return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
+  const upstreamContentType = upstream.headers.get("content-type") ?? "";
+  if (key && session && upstream.ok && upstreamContentType.includes("json")) {
+    const responseBody = await upstream.text();
+    const cacheWrite = putCachedGithubResponse(env, session, key, upstream, responseBody).catch(() => {
+      console.warn("[gity-relay] cache write failed");
+    });
+    if (waitUntil) waitUntil(cacheWrite);
+    else await cacheWrite;
+    responseHeaders.set("X-Gity-Cache", "miss");
+    return new Response(responseBody, {
+      status: upstream.status,
+      headers: responseHeaders,
+    });
+  }
+  return new Response(upstream.body, {
+    status: upstream.status,
+    headers: responseHeaders,
+  });
 }
 
 function relayError(

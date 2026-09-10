@@ -2,29 +2,32 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Gity is an **open-source (MIT)** personal GitHub dashboard on the edge: a static
-Next.js frontend on **Cloudflare Pages** plus small **Pages Functions** for GitHub
-login, resilient relay retries, and the optional protected
-read-only agent API. **GitHub itself is the source of truth**: the browser uses the
-GitHub REST and GraphQL APIs through a same-origin relay with a direct fallback.
-No database, no Redis, and no webhooks. Connect with GitHub and it works across your
-public and private repositories.
+Gity is an **open-source (MIT)** multi-user GitHub dashboard on the edge: a static
+Next.js frontend on **Cloudflare Pages** plus Pages Functions for secure GitHub
+login, encrypted sessions, D1-backed response caching, resilient relay retries,
+and the optional protected read-only agent API. GitHub remains the source of truth;
+D1 stores only session metadata and short-lived per-user API response caches.
 
 ## Architecture
 
 ```
 Browser / Gity (Cloudflare Pages, static)
-   ├── GitHub GraphQL API  (nested repo / PR / issue / contribution data)
-   ├── GitHub REST API     (search, Actions, events, token check)
-   └── Pages Functions ─┐  (login and GitHub relay)
-                        │   holds client_secret server-side, stores nothing
-                        ▼
-                      GitHub
+   │  HttpOnly gity_session cookie; no OAuth token in browser storage
+   ▼
+Pages Functions (same origin)
+   ├── /api/exchange, /api/refresh, /api/logout, /api/session
+   ├── /api/github ──► GitHub REST + GraphQL
+   └── D1 (Drizzle ORM)
+       ├── encrypted OAuth sessions
+       └── 60-second per-user GitHub response cache
 ```
 
-- Data calls prefer the same-origin Pages relay and fall back to `api.github.com` when a relay
-  gateway fails. The token is only ever sent to GitHub; the relay never stores or logs it.
-- Login codes are swapped for tokens in `functions/api/*` (same origin — no CORS involved).
+- OAuth access and refresh tokens are encrypted at rest in D1 and never returned to the browser.
+- The same-origin relay authenticates server sessions from the HttpOnly cookie; PAT fallback
+  requests remain explicitly browser-held and are not cached server-side.
+- Cache misses return the GitHub result immediately while the D1 write runs in the Pages
+  background; repeat requests can be served without another GitHub call.
+- Login codes are swapped for sessions in `functions/api/*` (same origin — no CORS involved).
 - UI components never make raw GitHub calls. All data flows through:
   - `src/lib/github/` — transport (`client.ts`), GraphQL docs (`graphql.ts`), typed REST
     helpers (`rest.ts`), TanStack Query keys/options (`queries.ts`), shared models
@@ -35,9 +38,9 @@ Browser / Gity (Cloudflare Pages, static)
 
 ## Stack
 
-Cloudflare Pages (hosting) + Pages Functions (login exchange and relay) · Next.js (App Router,
-static export) · TypeScript (strict) · Tailwind CSS · shadcn-style UI · TanStack Query ·
-Recharts · Lucide icons. Dark mode first.
+Cloudflare Pages (hosting) + Pages Functions · Cloudflare D1 + Drizzle ORM · Next.js (App Router,
+static export) · TypeScript (strict) · Tailwind CSS · shadcn-style UI · TanStack Query · Recharts ·
+Lucide icons. Dark mode first.
 
 ## Local setup
 
@@ -46,14 +49,15 @@ npm install
 npm run dev     # http://localhost:3000
 ```
 
-Open the app and sign in with GitHub or paste a token when prompted (or in Settings).
-That's it — no server configuration, no env secrets.
+For local UI work, the app can still use a PAT. For full OAuth/session behavior, run Pages
+Functions with a D1 binding and configure `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, and
+`SESSION_ENCRYPTION_KEY` as runtime variables/secrets.
 
 ## Login options
 
-**1. Connect with GitHub (recommended).** One-click PKCE login → `ghu_` user token with
-the app's read permissions. Works for public and private repos, auto-refreshes while the
-tab is open. Requires the one-time deployer setup below.
+**1. Connect with GitHub (recommended).** One-click PKCE login creates a server-side
+HttpOnly session with the app's read permissions. Works for public and private repos and
+renews automatically while the tab is open. GitHub tokens never enter browser storage.
 
 **2. Personal access token.** Fine-grained PAT pasted in the browser, stored in
 localStorage or sessionStorage. Identical data access — the offline-capable fallback.
@@ -68,7 +72,9 @@ GitHub requires a `client_secret` to exchange login codes, so the swap happens i
 2. In Cloudflare dashboard → Pages project → Settings → Environment variables:
    - `GITHUB_CLIENT_ID` = `Iv1.…` (plain variable — Client IDs are public).
    - `GITHUB_CLIENT_SECRET` = the secret ( **Encrypt** it).
-3. Redeploy (automatic on push). Users click “Connect with GitHub”, approve, and land
+   - `SESSION_ENCRYPTION_KEY` = a long random value ( **Encrypt** it).
+3. Apply the D1 migration from `apps/web`: `npm run db:migrate:remote`.
+4. Redeploy. Users click “Connect with GitHub”, approve, and land
    back in the dashboard — no token pasting.
 
 ## Hosting on Cloudflare
@@ -81,8 +87,10 @@ Monorepo layout: `apps/web` is the deployable project (Next.js static export in
 2. Build settings: **Root directory `apps/web`**, framework preset **Next.js
    (Static HTML Export)**, build command `npm run build`, output directory `out`.
    (Dependencies install inside `apps/web` — it is self-contained.)
-3. Every push to `main` redeploys automatically, with preview URLs per PR.
-4. Add the `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` environment variables as above
+3. If the Pages project is connected to Git, every push to `main` redeploys automatically.
+   For the current unconnected project, deploy the built `out/` directory explicitly:
+   `CLOUDFLARE_ACCOUNT_ID=<account-id> npx wrangler pages deploy out --project-name gity`.
+4. Add the `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` / `SESSION_ENCRYPTION_KEY` variables as above
    to enable login, then register the Callback URL on the GitHub App.
 
 ## Creating a fine-grained GitHub PAT
@@ -103,16 +111,19 @@ Generate new token. Minimum read permissions for full Gity functionality:
 Classic-token fallback: `repo` + `read:org` scopes cover everything but grant more than needed.
 If an org enforces SAML SSO, authorize the token for that org (“Configure SSO”) or org data 404s.
 
-## Token security (read this)
+## Session and token security (read this)
 
-Gity stores the token **only in browser storage** (localStorage by default, sessionStorage
-optionally) and sends it **only to `api.github.com`**. A frontend-only app cannot keep a
-secret: anyone or any script with access to this browser profile can read the token.
+The recommended OAuth path stores GitHub credentials encrypted in D1 and gives the browser
+only an opaque `HttpOnly; Secure; SameSite=Lax` session cookie. Session rows are scoped to a
+GitHub user, expire with the GitHub token, and are never included in API responses or logs.
 
-- Suitable for **personal/local use**.
-- **Not appropriate for a public multi-user deployment** — that would need a backend token
-  vault, which is out of scope for V1 by design.
-- Never paste a token on a shared machine; use short expirations; remove it in Settings when done.
+The PAT path is intentionally a compatibility fallback. PATs are stored only in browser
+storage and can be read by scripts running in that browser profile.
+
+- OAuth is the correct path for public/multi-user deployments.
+- Never paste a PAT on a shared machine; use short expirations; remove it in Settings when done.
+- Rotate `SESSION_ENCRYPTION_KEY` only with a planned session invalidation, because old
+  encrypted sessions cannot be decrypted with a new key.
 
 ## Live Refresh (auto-update)
 
@@ -128,8 +139,8 @@ so true real-time is impossible for a frontend. Gity instead implements
 - There is no manual refresh control: persisted data paints immediately and automatic
   incremental sync keeps it current without forcing full-history reloads.
 - Interval configurable in Settings: **Off / 15s / 30s / 60s / 5 min**.
-- Last session's data is cached in the browser, so revisits paint instantly and
-  then quietly revalidate live from GitHub in the background.
+- TanStack Query keeps the current view in the browser, while D1 keeps short-lived server
+  responses available across tabs and repeat visits for the same user.
 
 ## Agent API (read-only)
 
@@ -186,8 +197,11 @@ We deliberately call this “Live Refresh”, never “real-time”, in the UI.
 
 - Relay responses expose `X-Gity-Relay-Attempts` and `Server-Timing`; upstream failures are
   recorded in Cloudflare Pages function logs without tokens or query strings.
-- If usage grows beyond a personal dashboard, move OAuth/token handling and the relay to a
-  dedicated monitored Worker or backend with per-user rate limiting and centralized secrets.
+- D1 migrations live in `apps/web/migrations/` and the schema is defined in
+  `apps/web/functions/lib/schema.ts`; Drizzle is used for typed session/cache queries.
+- If usage grows substantially, move the relay to a dedicated monitored Worker with
+  per-user rate limiting and centralized observability; the session/data model is already
+  separated so that migration remains incremental.
 
 ## Gity Activity Streak
 
@@ -197,8 +211,8 @@ built from the contribution calendar overlaid with today's live events.
 
 ## Contributing
 
-PRs welcome. Keep the UI static and keep secrets server-side: no database, no secrets in the bundle
-(except the public GitHub-App Client ID). Run `npx tsc --noEmit` and `npm run build`
+PRs welcome. Keep the UI static and keep secrets server-side: no secrets in the bundle
+(except the public GitHub-App Client ID). Run `npx tsc --noEmit`, `npm test`, and `npm run build`
 before pushing.
 
 ## License

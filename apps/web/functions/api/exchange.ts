@@ -1,19 +1,18 @@
 /**
  * POST /api/exchange — swaps a short-lived OAuth code (+ PKCE verifier)
- * for user tokens. The client_secret never leaves this function.
- * Stores nothing, logs no tokens, returns only token fields.
+ * for an encrypted server-side D1 session. GitHub tokens never reach the
+ * browser and are never logged.
  */
-interface Env {
-  GITHUB_CLIENT_ID: string;
-  GITHUB_CLIENT_SECRET: string;
-}
+import type { GityEnv } from "../lib/env";
+import { createSession } from "../lib/session";
 
 const TOKEN_URL = "https://github.com/login/oauth/access_token";
+const USER_URL = "https://api.github.com/user";
 
-function json(data: unknown, status = 200): Response {
+function json(data: unknown, status = 200, headers?: HeadersInit): Response {
   return Response.json(data, {
     status,
-    headers: { "Cache-Control": "no-store" },
+    headers: { "Cache-Control": "no-store", ...headers },
   });
 }
 
@@ -22,7 +21,7 @@ export async function onRequestPost({
   env,
 }: {
   request: Request;
-  env: Env;
+  env: GityEnv;
 }): Promise<Response> {
   let body: { code?: string; code_verifier?: string; redirect_uri?: string };
   try {
@@ -33,9 +32,18 @@ export async function onRequestPost({
   if (!body.code || !body.code_verifier || !body.redirect_uri) {
     return json({ error: "bad_request" }, 400);
   }
-  let res: Response;
+
   try {
-    res = await fetch(TOKEN_URL, {
+    if (new URL(body.redirect_uri).origin !== new URL(request.url).origin) {
+      return json({ error: "invalid_redirect_uri" }, 400);
+    }
+  } catch {
+    return json({ error: "invalid_redirect_uri" }, 400);
+  }
+
+  let tokenResponse: Response;
+  try {
+    tokenResponse = await fetch(TOKEN_URL, {
       method: "POST",
       headers: { Accept: "application/json", "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -49,11 +57,79 @@ export async function onRequestPost({
   } catch {
     return json({ error: "upstream_unreachable" }, 502);
   }
-  const data = (await res.json()) as Record<string, unknown>;
-  if (!res.ok || data.error || !data.access_token) {
-    const code = typeof data.error === "string" ? data.error : "exchange_failed";
-    return json({ error: code }, 400);
+
+  const tokenData = (await tokenResponse.json()) as {
+    access_token?: string;
+    expires_in?: number;
+    refresh_token?: string;
+    error?: string;
+  };
+  if (!tokenResponse.ok || tokenData.error || !tokenData.access_token) {
+    return json(
+      { error: typeof tokenData.error === "string" ? tokenData.error : "exchange_failed" },
+      400,
+    );
   }
-  const { access_token, expires_in, refresh_token, refresh_token_expires_in, token_type } = data;
-  return json({ access_token, expires_in, refresh_token, refresh_token_expires_in, token_type });
+
+  let profileResponse: Response;
+  try {
+    profileResponse = await fetch(USER_URL, {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: "Bearer " + tokenData.access_token,
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "Gity-Session",
+      },
+    });
+  } catch {
+    return json({ error: "profile_unreachable" }, 502);
+  }
+  if (!profileResponse.ok) return json({ error: "profile_failed" }, 502);
+
+  const profile = (await profileResponse.json()) as {
+    id?: number;
+    login?: string;
+    name?: string | null;
+    avatar_url?: string;
+    html_url?: string;
+  };
+  if (!profile.id || !profile.login) return json({ error: "profile_failed" }, 502);
+
+  const expiresAt = tokenData.expires_in
+    ? Date.now() + tokenData.expires_in * 1000
+    : null;
+  try {
+    const session = await createSession(
+      env,
+      {
+        id: String(profile.id),
+        login: profile.login,
+        name: profile.name ?? null,
+        avatarUrl: profile.avatar_url ?? "",
+        htmlUrl: profile.html_url ?? "",
+      },
+      {
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token ?? null,
+        expiresAt,
+      },
+    );
+    return json(
+      {
+        session: {
+          login: profile.login,
+          name: profile.name ?? null,
+          avatarUrl: profile.avatar_url ?? "",
+          htmlUrl: profile.html_url ?? "",
+          fingerprint: session.fingerprint,
+          expiresAt: session.expiresAt,
+        },
+      },
+      200,
+      { "Set-Cookie": session.cookie },
+    );
+  } catch {
+    console.error("[gity-auth] session creation failed");
+    return json({ error: "session_unavailable" }, 503);
+  }
 }

@@ -66,10 +66,17 @@ export async function startLogin(): Promise<void> {
   window.location.href = `${AUTHORIZE_URL}?${params.toString()}`;
 }
 
+export interface ServerSession {
+  login: string;
+  name: string | null;
+  avatarUrl: string;
+  htmlUrl: string;
+  fingerprint: string;
+  expiresAt: number | null;
+}
+
 export interface OAuthTokens {
-  accessToken: string;
-  expiresIn?: number;
-  refreshToken?: string;
+  session: ServerSession;
 }
 
 /** Step 2 (callback page): validate state, swap code for tokens via /api. */
@@ -94,45 +101,26 @@ export async function finishLogin(search: string): Promise<OAuthTokens> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ code, code_verifier: verifier, redirect_uri: callbackUrl() }),
   });
-  const data = (await res.json()) as {
-    access_token?: string;
-    expires_in?: number;
-    refresh_token?: string;
-    error?: string;
-  };
-  if (!res.ok || !data.access_token) {
+  const data = (await res.json()) as { session?: ServerSession; error?: string };
+  if (!res.ok || !data.session) {
     throw new Error(
       data.error === "bad_verification_code"
         ? "This login link expired or was already used. Please start again."
         : "Could not complete login. Please try again.",
     );
   }
-  return {
-    accessToken: data.access_token,
-    expiresIn: data.expires_in,
-    refreshToken: data.refresh_token,
-  };
+  return { session: data.session };
 }
 
-/** Renew an expiring token via /api/refresh (secret stays server-side). */
-export async function refreshTokens(refreshToken: string): Promise<OAuthTokens> {
+/** Renew the encrypted server-side session via /api/refresh. */
+export async function refreshTokens(): Promise<OAuthTokens> {
   const res = await fetch("/api/refresh", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token: refreshToken }),
+    credentials: "same-origin",
   });
-  const data = (await res.json()) as {
-    access_token?: string;
-    expires_in?: number;
-    refresh_token?: string;
-    error?: string;
-  };
-  if (!res.ok || !data.access_token) {
+  const data = (await res.json()) as { session?: ServerSession; error?: string };
+  if (!res.ok || !data.session) {
     throw new Error("Session expired. Please connect again.");
   }
-  return {
-    accessToken: data.access_token,
-    expiresIn: data.expires_in,
-    refreshToken: data.refresh_token,
-  };
+  return { session: data.session };
 }

@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TD, TH, THead, TR, Table } from "@/components/ui/table";
-import { CachedDataNotice, EmptyState, ErrorState } from "@/components/common/error-state";
+import { EmptyState, ErrorState } from "@/components/common/error-state";
 import { CiDot } from "@/components/common/ci-dot";
 import { PageHead } from "@/components/layout/page-head";
 import { usePullRequests } from "@/features/pull-requests/use-prs-issues";
@@ -20,7 +20,7 @@ import { ageInDays, timeAgo } from "@/lib/utils";
 type Tab = "open" | "draft" | "review" | "approved" | "merged" | "closed" | "stale" | "all";
 
 export default function PullRequestsPage() {
-  const { prs, repos, prCiStates, isLoading, isRefreshing, error, dataUpdatedAt } = usePullRequests();
+  const { prs, repos, prCiStates, isLoading, error } = usePullRequests();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("open");
   const [org, setOrg] = useState("all");
@@ -72,9 +72,6 @@ export default function PullRequestsPage() {
 
   return (
     <div className="space-y-3">
-      {(isRefreshing || error) && prs.length > 0 ? (
-        <CachedDataNotice error={error} dataUpdatedAt={dataUpdatedAt} onRetry={retry} />
-      ) : null}
       <PageHead title="Pull requests" sub={`${rows.length} of ${prs.length} PRs · click to open on GitHub`} />
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
         <TabsList className="flex-wrap">

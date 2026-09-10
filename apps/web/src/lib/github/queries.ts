@@ -129,8 +129,8 @@ export function viewerOptions(token: string | null, fp: string) {
   return queryOptions<GithubUser, GithubApiError>({
     ...CALM,
     queryKey: qk.viewer(fp),
-    queryFn: () => fetchViewer(token!),
-    enabled: !!token,
+    queryFn: () => fetchViewer(token),
+    enabled: fp !== "anon",
     staleTime: 10 * 60_000,
     gcTime: 30 * 60_000,
     retry: (count, err) => retryPolicy(count, err),
@@ -141,8 +141,8 @@ export function orgsOptions(token: string | null, fp: string) {
   return queryOptions<GithubOrg[], GithubApiError>({
     ...CALM,
     queryKey: qk.orgs(fp),
-    queryFn: () => fetchOrgs(token!),
-    enabled: !!token,
+    queryFn: () => fetchOrgs(token),
+    enabled: fp !== "anon",
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
     retry: (count, err) => retryPolicy(count, err),
@@ -153,8 +153,8 @@ export function reposOptions(token: string | null, fp: string) {
   return queryOptions<GithubRepo[], GithubApiError>({
     ...CALM,
     queryKey: qk.repos(fp),
-    queryFn: () => fetchAllRepos(token!),
-    enabled: !!token,
+    queryFn: () => fetchAllRepos(token),
+    enabled: fp !== "anon",
     staleTime: 60_000,
     gcTime: 15 * 60_000,
     retry: (count, err) => retryPolicy(count, err),
@@ -186,13 +186,13 @@ export function ciStatesOptions(
         while (queue.length) {
           const repo = queue.shift()!;
           const [owner, name] = repo.fullName.split("/");
-          out[repo.fullName] = await fetchRepoCiState(token!, owner, name);
+          out[repo.fullName] = await fetchRepoCiState(token, owner, name);
         }
       });
       await Promise.all(workers);
       return out;
     },
-    enabled: !!token && targets.length > 0,
+    enabled: fp !== "anon" && targets.length > 0,
     staleTime: 60_000,
     gcTime: 10 * 60_000,
     retry: (count, err) => retryPolicy(count, err),
@@ -219,13 +219,13 @@ export function prCiStatesOptions(
         while (queue.length) {
           const pr = queue.shift()!;
           const [owner, name] = pr.repoFullName.split("/");
-          out[`${pr.repoFullName}#${pr.number}`] = await fetchPullRequestCiState(token!, owner, name, pr.number);
+          out[`${pr.repoFullName}#${pr.number}`] = await fetchPullRequestCiState(token, owner, name, pr.number);
         }
       });
       await Promise.all(workers);
       return out;
     },
-    enabled: !!token && targets.length > 0,
+    enabled: fp !== "anon" && targets.length > 0,
     staleTime: 60_000,
     gcTime: 10 * 60_000,
     retry: (count, err) => retryPolicy(count, err),
@@ -246,7 +246,7 @@ export function allPrsOptions(
       if (!login) return [];
       try {
         const { prs } = await fetchSearchPrsAndIssues(
-          token!,
+          token,
           searchQuery("pr", login, depth),
           { maxPages: depthPages(depth) },
         );
@@ -258,10 +258,10 @@ export function allPrsOptions(
         ) {
           throw error;
         }
-        return searchPrsRest(token!, `involves:${login}`, { maxPages: depthPages(depth) });
+        return searchPrsRest(token, `involves:${login}`, { maxPages: depthPages(depth) });
       }
     },
-    enabled: !!token && !!login,
+    enabled: fp !== "anon" && !!login,
     staleTime: 60_000,
     gcTime: 10 * 60_000,
     retry: (count, err) => retryPolicy(count, err),
@@ -311,7 +311,7 @@ export function allIssuesOptions(
       if (!login) return [];
       try {
         const { issues } = await fetchSearchPrsAndIssues(
-          token!,
+          token,
           searchQuery("issue", login, depth),
           { maxPages: depthPages(depth) },
         );
@@ -323,10 +323,10 @@ export function allIssuesOptions(
         ) {
           throw error;
         }
-        return searchIssuesRest(token!, `involves:${login}`, { maxPages: depthPages(depth) });
+        return searchIssuesRest(token, `involves:${login}`, { maxPages: depthPages(depth) });
       }
     },
-    enabled: !!token && !!login,
+    enabled: fp !== "anon" && !!login,
     staleTime: 60_000,
     gcTime: 10 * 60_000,
     retry: (count, err) => retryPolicy(count, err),
@@ -340,7 +340,7 @@ export function allIssuesOptions(
  * buckets (e.g. open → merged); callers apply their bucket filter after merge.
  */
 export async function fetchPrDelta(
-  token: string,
+  token: string | null,
   login: string,
   sinceYMD: string,
 ): Promise<GithubPullRequest[]> {
@@ -353,7 +353,7 @@ export async function fetchPrDelta(
 }
 
 export async function fetchIssueDelta(
-  token: string,
+  token: string | null,
   login: string,
   sinceYMD: string,
 ): Promise<GithubIssue[]> {
@@ -386,7 +386,7 @@ export function workflowRunsOptions(
         while (queue.length) {
           const repo = queue.shift()!;
           // Latest run per repo keeps this to 1 REST call per repo.
-          const runs = await fetchRepoWorkflowRuns(token!, repo.fullName, 3);
+          const runs = await fetchRepoWorkflowRuns(token, repo.fullName, 3);
           if (runs[0]) out.push(runs[0]);
           // Also keep any currently-running runs for the "running now" section.
           for (const r of runs.slice(1)) {
@@ -397,7 +397,7 @@ export function workflowRunsOptions(
       await Promise.all(workers);
       return out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     },
-    enabled: !!token && targets.length > 0,
+    enabled: fp !== "anon" && targets.length > 0,
     staleTime: 30_000,
     gcTime: 10 * 60_000,
     retry: (count, err) => retryPolicy(count, err),
@@ -411,8 +411,8 @@ export function eventsOptions(
 ) {
   return queryOptions<ActivityItem[], GithubApiError>({
     queryKey: qk.events(fp, login ?? "unknown"),
-    queryFn: () => fetchUserEvents(token!, login!),
-    enabled: !!token && !!login,
+    queryFn: () => fetchUserEvents(token, login!),
+    enabled: fp !== "anon" && !!login,
     staleTime: 60_000,
     gcTime: 10 * 60_000,
     retry: (count, err) => retryPolicy(count, err),
@@ -443,7 +443,7 @@ export function contributionsOptions(
         }
       }
       const results = await Promise.all(
-        windows.map((w) => fetchContributionDays(token!, login!, w.from, w.to)),
+        windows.map((w) => fetchContributionDays(token, login!, w.from, w.to)),
       );
       const byDate = new Map<string, number>();
       for (const days of results)
@@ -452,7 +452,7 @@ export function contributionsOptions(
         .map(([date, count]) => ({ date, count }))
         .sort((a, b) => a.date.localeCompare(b.date));
     },
-    enabled: !!token && !!login,
+    enabled: fp !== "anon" && !!login,
     staleTime: 10 * 60_000,
     gcTime: 30 * 60_000,
     retry: (count, err) => retryPolicy(count, err),

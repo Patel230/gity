@@ -1,11 +1,9 @@
 /**
- * POST /api/refresh — renews an expiring user token via its refresh token.
- * Same secret handling as /api/exchange: server-side only, nothing stored.
+ * POST /api/refresh — renews the encrypted server-side OAuth session.
+ * The refresh token is read from the HttpOnly cookie-backed D1 session.
  */
-interface Env {
-  GITHUB_CLIENT_ID: string;
-  GITHUB_CLIENT_SECRET: string;
-}
+import type { GityEnv } from "../lib/env";
+import { getSession, isSameOrigin, updateSessionTokens } from "../lib/session";
 
 const TOKEN_URL = "https://github.com/login/oauth/access_token";
 
@@ -21,35 +19,59 @@ export async function onRequestPost({
   env,
 }: {
   request: Request;
-  env: Env;
+  env: GityEnv;
 }): Promise<Response> {
-  let body: { refresh_token?: string };
+  if (!isSameOrigin(request)) return json({ error: "cross_origin_request" }, 403);
+  const session = await getSession(request, env);
+  if (!session) return json({ error: "unauthorized" }, 401);
+  if (!session.refreshToken) return json({ error: "session_expired" }, 401);
+
+  let response: Response;
   try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    return json({ error: "bad_request" }, 400);
-  }
-  if (!body.refresh_token) return json({ error: "bad_request" }, 400);
-  let res: Response;
-  try {
-    res = await fetch(TOKEN_URL, {
+    response = await fetch(TOKEN_URL, {
       method: "POST",
       headers: { Accept: "application/json", "Content-Type": "application/json" },
       body: JSON.stringify({
         client_id: env.GITHUB_CLIENT_ID,
         client_secret: env.GITHUB_CLIENT_SECRET,
         grant_type: "refresh_token",
-        refresh_token: body.refresh_token,
+        refresh_token: session.refreshToken,
       }),
     });
   } catch {
     return json({ error: "upstream_unreachable" }, 502);
   }
-  const data = (await res.json()) as Record<string, unknown>;
-  if (!res.ok || data.error || !data.access_token) {
-    const code = typeof data.error === "string" ? data.error : "exchange_failed";
-    return json({ error: code }, 400);
+
+  const data = (await response.json()) as {
+    access_token?: string;
+    expires_in?: number;
+    refresh_token?: string;
+    error?: string;
+  };
+  if (!response.ok || data.error || !data.access_token) {
+    return json({ error: "session_expired" }, 401);
   }
-  const { access_token, expires_in, refresh_token, refresh_token_expires_in, token_type } = data;
-  return json({ access_token, expires_in, refresh_token, refresh_token_expires_in, token_type });
+
+  const expiresAt = data.expires_in
+    ? Date.now() + data.expires_in * 1000
+    : null;
+  try {
+    await updateSessionTokens(env, session.id, {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token ?? session.refreshToken,
+      expiresAt,
+    });
+  } catch {
+    return json({ error: "session_unavailable" }, 503);
+  }
+  return json({
+    session: {
+      login: session.login,
+      name: session.name,
+      avatarUrl: session.avatarUrl,
+      htmlUrl: session.htmlUrl,
+      fingerprint: session.fingerprint,
+      expiresAt,
+    },
+  });
 }

@@ -93,7 +93,7 @@ interface RestEvent {
 
 /* --------------------------------- viewer --------------------------------- */
 
-export async function fetchViewer(token: string): Promise<GithubUser> {
+export async function fetchViewer(token: string | null): Promise<GithubUser> {
   const data = await graphqlFetch<{
     viewer: { login: string; name: string | null; avatarUrl: string; url: string };
   }>(token, VIEWER_QUERY);
@@ -106,7 +106,7 @@ export async function fetchViewer(token: string): Promise<GithubUser> {
 }
 
 /** Lightweight token check that also proves basic REST access. */
-export async function checkToken(token: string): Promise<GithubUser> {
+export async function checkToken(token: string | null): Promise<GithubUser> {
   const { data } = await restFetch<RestUser>(token, "/user");
   return {
     login: data.login,
@@ -129,7 +129,7 @@ interface OrgsPayload {
   };
 }
 
-export async function fetchOrgs(token: string): Promise<GithubOrg[]> {
+export async function fetchOrgs(token: string | null): Promise<GithubOrg[]> {
   const nodes = await fetchAllConnectionPages(
     async (after) => {
       const data = await graphqlFetch<OrgsPayload>(token, ORGS_QUERY, { after });
@@ -202,7 +202,7 @@ function toRepo(n: RepoNode): GithubRepo {
 }
 
 /** All repositories visible to the viewer (personal + org), fully paginated. */
-export async function fetchAllRepos(token: string): Promise<GithubRepo[]> {
+export async function fetchAllRepos(token: string | null): Promise<GithubRepo[]> {
   const nodes = await fetchAllConnectionPages(
     async (after) => {
       const data = await graphqlFetch<ReposPayload>(token, REPOS_QUERY, { after });
@@ -215,7 +215,7 @@ export async function fetchAllRepos(token: string): Promise<GithubRepo[]> {
 
 /** Default-branch combined CI state for one repo (graceful when checks are inaccessible). */
 export async function fetchRepoCiState(
-  token: string,
+  token: string | null,
   owner: string,
   name: string,
 ): Promise<CiState> {
@@ -245,7 +245,7 @@ export async function fetchRepoCiState(
 
 /** CI state for a pull request's latest head commit. */
 export async function fetchPullRequestCiState(
-  token: string,
+  token: string | null,
   owner: string,
   name: string,
   number: number,
@@ -334,7 +334,7 @@ interface SearchPayload {
  * issues that are actually PRs are never double-counted.
  */
 export async function fetchSearchPrsAndIssues(
-  token: string,
+  token: string | null,
   query: string,
   opts?: { maxPages?: number },
 ): Promise<{ prs: GithubPullRequest[]; issues: GithubIssue[] }> {
@@ -399,7 +399,7 @@ export async function fetchSearchPrsAndIssues(
 
 /** REST search fallback for PR aggregation (also powers author/org-scoped lists). */
 export async function searchPrsRest(
-  token: string,
+  token: string | null,
   query: string,
   opts?: { maxPages?: number },
 ): Promise<GithubPullRequest[]> {
@@ -444,7 +444,7 @@ export async function searchPrsRest(
 
 /** REST search fallback for issue aggregation — excludes anything with `pull_request`. */
 export async function searchIssuesRest(
-  token: string,
+  token: string | null,
   query: string,
   opts?: { maxPages?: number },
 ): Promise<GithubIssue[]> {
@@ -516,7 +516,7 @@ function ciStateFromRollup(state: string | null | undefined): CiState {
 
 /** Open PRs for one repo (detailed — review decisions included). */
 export async function fetchRepoOpenPrs(
-  token: string,
+  token: string | null,
   owner: string,
   name: string,
 ): Promise<GithubPullRequest[]> {
@@ -589,7 +589,7 @@ export function toWorkflowRun(
 
 /** Latest workflow runs for a repo (REST — the right tool for Actions). */
 export async function fetchRepoWorkflowRuns(
-  token: string,
+  token: string | null,
   fullName: string,
   perPage = 10,
 ): Promise<GithubWorkflowRun[]> {
@@ -613,7 +613,7 @@ export async function fetchRepoWorkflowRuns(
 /* --------------------------------- activity -------------------------------- */
 
 export async function fetchUserEvents(
-  token: string,
+  token: string | null,
   login: string,
   perPage = 100,
 ): Promise<ActivityItem[]> {
@@ -719,7 +719,7 @@ function toActivityItems(e: RestEvent): ActivityItem[] {
 /* ------------------------------- contributions ------------------------------ */
 
 export async function fetchContributionDays(
-  token: string,
+  token: string | null,
   login: string,
   from: string,
   to: string,

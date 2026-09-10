@@ -22,16 +22,13 @@ export default function AuthCallbackPage() {
 function CallbackInner() {
   const params = useSearchParams();
   const router = useRouter();
-  const { setOAuthSession } = useAuth();
+  const { setServerSession } = useAuth();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     finishLogin(params.toString())
       .then((t) => {
-        setOAuthSession(t.accessToken, {
-          refreshToken: t.refreshToken ?? null,
-          expiresAt: t.expiresIn ? Date.now() + t.expiresIn * 1000 : null,
-        });
+        setServerSession(t.session);
         router.replace("/");
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Login failed."));

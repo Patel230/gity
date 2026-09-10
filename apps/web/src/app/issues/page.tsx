@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TD, TH, THead, TR, Table } from "@/components/ui/table";
-import { CachedDataNotice, EmptyState, ErrorState } from "@/components/common/error-state";
+import { EmptyState, ErrorState } from "@/components/common/error-state";
 import { PageHead } from "@/components/layout/page-head";
 import { useIssues } from "@/features/pull-requests/use-prs-issues";
 import { ageInDays, timeAgo } from "@/lib/utils";
@@ -18,7 +18,7 @@ import { ageInDays, timeAgo } from "@/lib/utils";
 type Tab = "open" | "closed" | "stale" | "mine" | "all";
 
 export default function IssuesPage() {
-  const { issues, isLoading, isRefreshing, error, dataUpdatedAt } = useIssues();
+  const { issues, isLoading, error } = useIssues();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("open");
   const [org, setOrg] = useState("all");
@@ -79,9 +79,6 @@ export default function IssuesPage() {
 
   return (
     <div className="space-y-3">
-      {(isRefreshing || error) && issues.length > 0 ? (
-        <CachedDataNotice error={error} dataUpdatedAt={dataUpdatedAt} onRetry={retry} />
-      ) : null}
       <PageHead title="Issues" sub={`${rows.length} of ${issues.length} issues · pull requests are never counted here`} />
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
         <TabsList>

@@ -19,14 +19,18 @@ import { GithubStarLink } from "@/components/common/github-star";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { token, setToken } = useAuth();
+  const { token, serverSession, ready, setToken } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (pathname?.startsWith("/auth/callback")) {
     return <>{children}</>;
   }
 
-  if (!token) {
+  if (!ready) {
+    return <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Loading your workspace…</div>;
+  }
+
+  if (!token && !serverSession) {
     return <TokenGate onSave={(t) => setToken(t, "local")} />;
   }
   return (
@@ -48,8 +52,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Header onMenu={() => setSidebarOpen(true)} />
         <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-5 sm:px-5">{children}</main>
         <footer className="border-t border-border px-4 py-2 text-center text-[11px] text-muted-foreground">
-          Developers &amp; agents managing GitHub together. Your token stays in this browser and is
-          forwarded only for GitHub requests. <GithubStarLink compact />
+          Developers &amp; agents managing GitHub together. OAuth credentials stay server-side in an
+          encrypted session; local PATs remain browser-only. <GithubStarLink compact />
         </footer>
       </div>
     </div>

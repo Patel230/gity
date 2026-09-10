@@ -2,5 +2,13 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "gity",
   "pages_build_output_dir": "./out",
-  "compatibility_date": "2026-09-01"
+  "compatibility_date": "2026-09-01",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "gity-prod",
+      "database_id": "930120c3-f470-4a61-a22a-8d688459bc81",
+      "migrations_dir": "migrations"
+    }
+  ]
 }

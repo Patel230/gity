@@ -23,9 +23,9 @@ export function usePullRequests() {
   // starts after that fast head query and replaces it when ready.
   const headQ = useLiveQuery({ ...allPrsOptions(token, fp, login, "head") });
   const fullQ = useDeltaSearch<GithubPullRequest>(
-    { ...allPrsOptions(token, fp, login), enabled: !!token && !!login && headQ.data !== undefined },
+    { ...allPrsOptions(token, fp, login), enabled: fp !== "anon" && !!login && headQ.data !== undefined },
     "prs",
-    (since) => fetchPrDelta(token!, login!, since),
+    (since) => fetchPrDelta(token, login!, since),
     (all) => all,
   );
 
@@ -53,9 +53,9 @@ export function useIssues() {
   const reposQ = useLiveQuery({ ...reposOptions(token, fp) });
   const headQ = useLiveQuery({ ...allIssuesOptions(token, fp, login, "head") });
   const fullQ = useDeltaSearch<GithubIssue>(
-    { ...allIssuesOptions(token, fp, login), enabled: !!token && !!login && headQ.data !== undefined },
+    { ...allIssuesOptions(token, fp, login), enabled: fp !== "anon" && !!login && headQ.data !== undefined },
     "issues",
-    (since) => fetchIssueDelta(token!, login!, since),
+    (since) => fetchIssueDelta(token, login!, since),
     (all) => all,
   );
   const visibleIssues = fullQ.data ?? headQ.data ?? [];

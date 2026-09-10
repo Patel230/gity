@@ -9,7 +9,7 @@ import { startLogin } from "@/lib/oauth";
 import { BrandLogo } from "@/components/layout/brand-logo";
 import { GithubStarLink } from "@/components/common/github-star";
 
-/** Rendered when no token is stored — GitHub login preferred, PAT fallback. */
+/** Rendered when no server session or local PAT is available. */
 export function TokenGate({ onSave }: { onSave: (token: string) => void }) {
   const [value, setValue] = useState("");
   const [showPat, setShowPat] = useState(false);
@@ -50,7 +50,8 @@ export function TokenGate({ onSave }: { onSave: (token: string) => void }) {
           </CardTitle>
           <CardDescription>
             Connect with GitHub to read your public and private repositories.
-            Gity reads data directly from GitHub and keeps your token in this browser only.
+            OAuth credentials stay in an encrypted server-side session. A local PAT is available as
+            a compatibility fallback.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -95,8 +96,8 @@ export function TokenGate({ onSave }: { onSave: (token: string) => void }) {
           <div className="flex gap-2 rounded-md border border-[color-mix(in_srgb,var(--warning)_50%,var(--border))] bg-[color-mix(in_srgb,var(--warning)_8%,transparent)] p-2.5 text-[11px] leading-relaxed text-muted-foreground">
             <ShieldAlert className="mt-0.5 size-4 shrink-0 text-[var(--warning)]" />
             <span>
-              Your token stays in this browser. Use Gity on a trusted device and never share this
-              browser profile. For team or public deployments, use a server-side authentication flow.
+              OAuth keeps GitHub credentials off the browser. If you use a PAT fallback, it stays in
+              this browser—use it only on a trusted device and never share this browser profile.
             </span>
           </div>
         </CardContent>
@@ -110,7 +111,8 @@ export function TokenGate({ onSave }: { onSave: (token: string) => void }) {
             <CardTitle className="text-sm">Private by default</CardTitle>
           </CardHeader>
           <CardContent className="text-xs leading-relaxed text-muted-foreground">
-            Your credential stays in this browser and requests go directly to GitHub.
+            OAuth requests use a short-lived encrypted server session; PAT fallback credentials stay
+            in this browser.
           </CardContent>
         </Card>
         <Card accent={2} className="bg-card/60">
