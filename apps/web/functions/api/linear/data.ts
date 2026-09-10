@@ -7,7 +7,7 @@ const GRAPHQL_URL = "https://api.linear.app/graphql";
 const LINEAR_QUERY = `query GityLinearData {
   viewer { id name }
   teams(first: 50) { nodes { id name key color } }
-  projects(first: 50) { nodes { id name url state { name type } } }
+  projects(first: 50) { nodes { id name url status { name type } } }
   issues(first: 100, orderBy: updatedAt) {
     nodes {
       id identifier title url createdAt updatedAt
@@ -22,7 +22,7 @@ const LINEAR_QUERY = `query GityLinearData {
 type RawData = {
   viewer?: { id: string; name: string | null };
   teams?: { nodes: { id: string; name: string; key: string; color: string | null }[] };
-  projects?: { nodes: { id: string; name: string; url: string; state: { name: string; type: string } | null }[] };
+  projects?: { nodes: { id: string; name: string; url: string; status: { name: string; type: string } | null }[] };
   issues?: { nodes: {
     id: string; identifier: string; title: string; url: string; createdAt: string; updatedAt: string;
     state: { name: string; type: string; color: string | null } | null;
@@ -92,7 +92,7 @@ export async function onRequestGet({ request, env }: { request: Request; env: Gi
   return json({
     viewer: data.viewer ?? null,
     teams: data.teams?.nodes ?? [],
-    projects: data.projects?.nodes ?? [],
+    projects: (data.projects?.nodes ?? []).map((project) => ({ ...project, state: project.status })),
     issues: data.issues?.nodes ?? [],
     fetchedAt: Date.now(),
   });
