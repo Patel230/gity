@@ -4,7 +4,7 @@
 
 Gity is an **open-source (MIT)** personal GitHub dashboard on the edge: a static
 Next.js frontend on **Cloudflare Pages** plus small **Pages Functions** for GitHub
-login, resilient relay retries, health monitoring, and the optional protected
+login, resilient relay retries, and the optional protected
 read-only agent API. **GitHub itself is the source of truth**: the browser uses the
 GitHub REST and GraphQL APIs through a same-origin relay with a direct fallback.
 No database, no Redis, and no webhooks. Connect with GitHub and it works across your
@@ -16,7 +16,7 @@ public and private repositories.
 Browser / Gity (Cloudflare Pages, static)
    ├── GitHub GraphQL API  (nested repo / PR / issue / contribution data)
    ├── GitHub REST API     (search, Actions, events, token check)
-   └── Pages Functions ─┐  (login, GitHub relay, and health probe)
+   └── Pages Functions ─┐  (login and GitHub relay)
                         │   holds client_secret server-side, stores nothing
                         ▼
                       GitHub
@@ -35,7 +35,7 @@ Browser / Gity (Cloudflare Pages, static)
 
 ## Stack
 
-Cloudflare Pages (hosting) + Pages Functions (login exchange, relay, health) · Next.js (App Router,
+Cloudflare Pages (hosting) + Pages Functions (login exchange and relay) · Next.js (App Router,
 static export) · TypeScript (strict) · Tailwind CSS · shadcn-style UI · TanStack Query ·
 Recharts · Lucide icons. Dark mode first.
 
@@ -184,7 +184,6 @@ We deliberately call this “Live Refresh”, never “real-time”, in the UI.
 
 ## Operations and scale
 
-- `GET /api/health` is a no-store GitHub reachability probe suitable for an uptime monitor.
 - Relay responses expose `X-Gity-Relay-Attempts` and `Server-Timing`; upstream failures are
   recorded in Cloudflare Pages function logs without tokens or query strings.
 - If usage grows beyond a personal dashboard, move OAuth/token handling and the relay to a
