@@ -5,7 +5,7 @@ import { ArrowDownUp, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FilterSelect, textOptions } from "@/components/common/filter-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TD, TH, THead, TR, Table } from "@/components/ui/table";
 import { CiDot } from "@/components/common/ci-dot";
@@ -26,9 +26,9 @@ export default function RepositoriesPage() {
   const [activity, setActivity] = useState("all");
   const [sort, setSort] = useState<SortKey>("pushed");
 
-  const orgs = useMemo(() => [...new Set(repos.map((r) => r.ownerLogin))].sort(), [repos]);
-  const langs = useMemo(
-    () => [...new Set(repos.map((r) => r.primaryLanguage).filter(Boolean) as string[])].sort(),
+  const orgOptions = useMemo(() => textOptions(repos.map((r) => r.ownerLogin), "organizations"), [repos]);
+  const languageOptions = useMemo(
+    () => textOptions(repos.map((r) => r.primaryLanguage).filter(Boolean) as string[], "languages"),
     [repos],
   );
 
@@ -71,23 +71,25 @@ export default function RepositoriesPage() {
       <PageHead title="Repositories" sub={`${rows.length} of ${repos.length} repos`} />
       <div className="flex flex-wrap items-center gap-2">
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search repos…" className="w-48" />
-        <Filter value={org} onChange={setOrg} label="Org" options={["all", ...orgs]} />
-        <Filter value={vis} onChange={setVis} label="Visibility" options={["all", "public", "private"]} />
-        <Filter value={lang} onChange={setLang} label="Language" options={["all", ...langs]} />
-        <Filter value={arch} onChange={setArch} label="Archived" options={["all", "active", "archived"]} />
-        <Filter value={activity} onChange={setActivity} label="Activity" options={["all", "active", "inactive"]} />
+        <FilterSelect value={org} onChange={setOrg} label="Organizations" options={orgOptions} />
+        <FilterSelect value={vis} onChange={setVis} label="Visibility" options={[{ value: "all", label: "All visibility" }, { value: "public", label: "Public" }, { value: "private", label: "Private" }]} />
+        <FilterSelect value={lang} onChange={setLang} label="Languages" options={languageOptions} />
+        <FilterSelect value={arch} onChange={setArch} label="Archived" options={[{ value: "all", label: "All archived" }, { value: "active", label: "Active" }, { value: "archived", label: "Archived" }]} />
+        <FilterSelect value={activity} onChange={setActivity} label="Activity" options={[{ value: "all", label: "All activity" }, { value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]} />
         <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
           <ArrowDownUp className="size-3" />
-          <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
-            <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="pushed">Last pushed</SelectItem>
-              <SelectItem value="stars">Stars</SelectItem>
-              <SelectItem value="name">Name</SelectItem>
-              <SelectItem value="prs">Open PRs</SelectItem>
-              <SelectItem value="issues">Open issues</SelectItem>
-            </SelectContent>
-          </Select>
+          <FilterSelect
+            value={sort}
+            onChange={(v) => setSort(v as SortKey)}
+            label="Sort by"
+            options={[
+              { value: "pushed", label: "Last pushed" },
+              { value: "stars", label: "Stars" },
+              { value: "name", label: "Name" },
+              { value: "prs", label: "Open PRs" },
+              { value: "issues", label: "Open issues" },
+            ]}
+          />
         </span>
       </div>
       {rows.length === 0 ? (
@@ -158,21 +160,4 @@ export default function RepositoriesPage() {
 function daysSince(iso: string | null): number {
   if (!iso) return Infinity;
   return (Date.now() - new Date(iso).getTime()) / 86_400_000;
-}
-
-function Filter({ value, onChange, label, options }: { value: string; onChange: (v: string) => void; label: string; options: string[] }) {
-  return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="h-8 w-auto min-w-24" title={label}>
-        <SelectValue placeholder={label} />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((o) => (
-          <SelectItem key={o} value={o}>
-            {o === "all" ? `All ${label.toLowerCase()}` : o}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
 }

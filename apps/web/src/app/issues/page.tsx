@@ -6,11 +6,11 @@ import { ExternalLink } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TD, TH, THead, TR, Table } from "@/components/ui/table";
 import { EmptyState, ErrorState } from "@/components/common/error-state";
+import { FilterSelect, textOptions } from "@/components/common/filter-select";
 import { PageHead } from "@/components/layout/page-head";
 import { useIssues } from "@/features/pull-requests/use-prs-issues";
 import { ageInDays, timeAgo } from "@/lib/utils";
@@ -18,15 +18,30 @@ import { ageInDays, timeAgo } from "@/lib/utils";
 type Tab = "open" | "closed" | "stale" | "mine" | "all";
 
 export default function IssuesPage() {
-  const { issues, isLoading, error } = useIssues();
+  const { issues, repos, isLoading, error } = useIssues();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("open");
   const [org, setOrg] = useState("all");
+  const [repo, setRepo] = useState("all");
   const [assignee, setAssignee] = useState("all");
   const [label, setLabel] = useState("all");
   const [q, setQ] = useState("");
 
-  const orgs = useMemo(() => [...new Set(issues.map((i) => i.orgLogin))].sort(), [issues]);
+  const orgOptions = useMemo(
+    () => textOptions([...repos.map((r) => r.ownerLogin), ...issues.map((i) => i.orgLogin)], "organizations"),
+    [repos, issues],
+  );
+  const repoOptions = useMemo(() => {
+    const names = [
+      ...repos
+        .filter((r) => org === "all" || r.ownerLogin === org)
+        .map((r) => r.fullName),
+      ...issues
+        .filter((i) => org === "all" || i.orgLogin === org)
+        .map((i) => i.repoFullName),
+    ];
+    return textOptions(names, "repositories");
+  }, [repos, issues, org]);
   const assignees = useMemo(
     () => [...new Set(issues.flatMap((i) => i.assignees))].sort(),
     [issues],
@@ -44,12 +59,13 @@ export default function IssuesPage() {
       if (tab === "stale" && !(i.state === "open" && ageInDays(i.updatedAt) >= 30)) return false;
       if (tab === "mine" && !(i.assignees.length > 0 && i.state === "open")) return false;
       if (org !== "all" && i.orgLogin !== org) return false;
+      if (repo !== "all" && i.repoFullName !== repo) return false;
       if (assignee !== "all" && !i.assignees.includes(assignee)) return false;
       if (label !== "all" && !i.labels.some((l) => l.name === label)) return false;
       if (needle && !`${i.title} #${i.number} ${i.repoFullName}`.toLowerCase().includes(needle)) return false;
       return true;
     });
-  }, [issues, tab, org, assignee, label, q]);
+  }, [issues, tab, org, repo, assignee, label, q]);
 
   const counts = useMemo(
     () => ({
@@ -91,9 +107,10 @@ export default function IssuesPage() {
       </Tabs>
       <div className="flex flex-wrap items-center gap-2">
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search issues…" className="w-44" />
-        <Filter value={org} onChange={setOrg} options={["all", ...orgs]} label="org" />
-        <Filter value={assignee} onChange={setAssignee} options={["all", ...assignees]} label="assignee" />
-        <Filter value={label} onChange={setLabel} options={["all", ...labels]} label="label" />
+        <FilterSelect value={org} onChange={(v) => { setOrg(v); setRepo("all"); }} options={orgOptions} label="Organizations" />
+        <FilterSelect value={repo} onChange={setRepo} options={repoOptions} label="Repositories" wide />
+        <FilterSelect value={assignee} onChange={setAssignee} options={textOptions(assignees, "assignees")} label="Assignees" />
+        <FilterSelect value={label} onChange={setLabel} options={textOptions(labels, "labels")} label="Labels" />
       </div>
       {rows.length === 0 ? (
         <EmptyState title="No issues" hint="Nothing matches this filter set." />
@@ -153,22 +170,5 @@ export default function IssuesPage() {
         </Table>
       )}
     </div>
-  );
-}
-
-function Filter({ value, onChange, options, label }: { value: string; onChange: (v: string) => void; options: string[]; label: string }) {
-  return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="h-8 w-auto min-w-24" title={label}>
-        <SelectValue placeholder={label} />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((o) => (
-          <SelectItem key={o} value={o}>
-            {o === "all" ? `All ${label}s` : o}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
   );
 }

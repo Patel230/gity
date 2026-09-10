@@ -6,12 +6,12 @@ import { ExternalLink } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TD, TH, THead, TR, Table } from "@/components/ui/table";
 import { EmptyState, ErrorState } from "@/components/common/error-state";
 import { CiDot } from "@/components/common/ci-dot";
+import { FilterSelect, textOptions } from "@/components/common/filter-select";
 import { PageHead } from "@/components/layout/page-head";
 import { usePullRequests } from "@/features/pull-requests/use-prs-issues";
 import type { GithubPullRequest } from "@/lib/github/types";
@@ -28,12 +28,22 @@ export default function PullRequestsPage() {
   const [author, setAuthor] = useState("all");
   const [q, setQ] = useState("");
 
-  const orgs = useMemo(() => [...new Set(prs.map((p) => p.orgLogin))].sort(), [prs]);
-  const repoNames = useMemo(
-    () => [...new Set(prs.filter((p) => org === "all" || p.orgLogin === org).map((p) => p.repoFullName))].sort(),
-    [prs, org],
+  const orgOptions = useMemo(
+    () => textOptions([...repos.map((r) => r.ownerLogin), ...prs.map((p) => p.orgLogin)], "organizations"),
+    [repos, prs],
   );
-  const authors = useMemo(() => [...new Set(prs.map((p) => p.authorLogin))].sort(), [prs]);
+  const repoOptions = useMemo(() => {
+    const names = [
+      ...repos
+        .filter((r) => org === "all" || r.ownerLogin === org)
+        .map((r) => r.fullName),
+      ...prs
+        .filter((p) => org === "all" || p.orgLogin === org)
+        .map((p) => p.repoFullName),
+    ];
+    return textOptions(names, "repositories");
+  }, [repos, prs, org]);
+  const authorOptions = useMemo(() => textOptions(prs.map((p) => p.authorLogin), "authors"), [prs]);
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -84,9 +94,9 @@ export default function PullRequestsPage() {
       </Tabs>
       <div className="flex flex-wrap items-center gap-2">
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search PRs…" className="w-44" />
-        <Filter value={org} onChange={(v) => { setOrg(v); setRepo("all"); }} options={["all", ...orgs]} label="org" />
-        <Filter value={repo} onChange={setRepo} options={["all", ...repoNames]} label="repo" wide />
-        <Filter value={author} onChange={setAuthor} options={["all", ...authors]} label="author" />
+        <FilterSelect value={org} onChange={(v) => { setOrg(v); setRepo("all"); }} options={orgOptions} label="Organizations" />
+        <FilterSelect value={repo} onChange={setRepo} options={repoOptions} label="Repositories" wide />
+        <FilterSelect value={author} onChange={setAuthor} options={authorOptions} label="Authors" />
       </div>
       {rows.length === 0 ? (
         <EmptyState title="No pull requests" hint="Nothing matches this filter set. PR coverage comes from repos you can access." />
@@ -180,21 +190,4 @@ function ReviewBadge({ p }: { p: GithubPullRequest }) {
     default:
       return <span className="whitespace-nowrap text-xs text-muted-foreground">Not reviewed</span>;
   }
-}
-
-function Filter({ value, onChange, options, label, wide }: { value: string; onChange: (v: string) => void; options: string[]; label: string; wide?: boolean }) {
-  return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className={`h-8 ${wide ? "w-52" : "w-auto min-w-24"}`} title={label}>
-        <SelectValue placeholder={label} />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((o) => (
-          <SelectItem key={o} value={o}>
-            {o === "all" ? `All ${label}s` : o}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
 }

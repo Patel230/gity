@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FilterSelect } from "@/components/common/filter-select";
 import { OAuthCard } from "@/components/common/oauth-card";
 import { RateLimitPanel } from "@/components/common/rate-limit";
 import { ConnectionTest } from "@/components/common/connection-test";
@@ -96,13 +96,15 @@ export function SettingsPage({ embedded = false, section }: { embedded?: boolean
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Select value={mode} onValueChange={(v) => setMode(v as StorageMode)}>
-            <SelectTrigger className="h-8 w-64"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="local">localStorage (persists)</SelectItem>
-                <SelectItem value="session">sessionStorage (this tab only)</SelectItem>
-              </SelectContent>
-            </Select>
+            <FilterSelect
+              value={mode}
+              onChange={(v) => setMode(v as StorageMode)}
+              label="Storage"
+              options={[
+                { value: "local", label: "localStorage (persists)" },
+                { value: "session", label: "sessionStorage (this tab only)" },
+              ]}
+            />
             <Button size="sm" disabled={!draft} onClick={() => { setToken(draft, mode); setDraft(""); setTestResult(null); }}>
               {token ? "Replace token" : "Save token"}
             </Button>
@@ -133,14 +135,12 @@ export function SettingsPage({ embedded = false, section }: { embedded?: boolean
         <CardContent>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Poll important data</span>
-            <Select value={poll} onValueChange={(v) => setPoll(v as PollInterval)}>
-              <SelectTrigger className="h-8 w-44"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {(Object.keys(POLL_LABEL) as PollInterval[]).map((p) => (
-                  <SelectItem key={p} value={p}>{POLL_LABEL[p]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <FilterSelect
+              value={poll}
+              onChange={(v) => setPoll(v as PollInterval)}
+              label="Poll interval"
+              options={(Object.keys(POLL_LABEL) as PollInterval[]).map((p) => ({ value: p, label: POLL_LABEL[p] }))}
+            />
           </div>
         </CardContent>
       </Card>}
@@ -151,12 +151,12 @@ export function SettingsPage({ embedded = false, section }: { embedded?: boolean
           <CardDescription>Choose a default or one of 20 curated open-source palettes, then switch between Dark and Light appearances.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Select value={theme} onValueChange={(v) => setTheme(v as Theme)}>
-            <SelectTrigger className="h-8 w-52"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {FEATURED_THEMES.map((id) => <SelectItem key={id} value={id}>{THEMES[id].label}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <FilterSelect
+            value={theme}
+            onChange={(v) => setTheme(v as Theme)}
+            label="Theme"
+            options={FEATURED_THEMES.map((id) => ({ value: id, label: THEMES[id].label }))}
+          />
           <div className="mt-3 flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Appearance</span>
             <Button size="sm" variant={appearance === "dark" ? "default" : "outline"} onClick={() => setAppearance("dark")}><Moon className="size-3" /> Dark</Button>
