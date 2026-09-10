@@ -19,14 +19,18 @@ export function usePullRequests() {
   const login = viewer.data?.login;
   const reposQ = useLiveQuery({ ...reposOptions(token, fp) });
   const ciQ = useLiveQuery({ ...ciStatesOptions(token, fp, reposQ.data) });
-  const prsQ = useDeltaSearch<GithubPullRequest>(
-    { ...allPrsOptions(token, fp, login) },
+  // Render the first 100 recent PRs immediately. The complete history sync
+  // starts after that fast head query and replaces it when ready.
+  const headQ = useLiveQuery({ ...allPrsOptions(token, fp, login, "head") });
+  const fullQ = useDeltaSearch<GithubPullRequest>(
+    { ...allPrsOptions(token, fp, login), enabled: !!token && !!login && headQ.data !== undefined },
     "prs",
     (since) => fetchPrDelta(token!, login!, since),
     (all) => all,
   );
 
-  const sorted = [...(prsQ.data ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const visiblePrs = fullQ.data ?? headQ.data ?? [];
+  const sorted = [...visiblePrs].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const prCiQ = useLiveQuery({ ...prCiStatesOptions(token, fp, sorted) });
 
   return {
@@ -35,10 +39,10 @@ export function usePullRequests() {
     repos: reposQ.data ?? [],
     ciStates: ciQ.data ?? {},
     prCiStates: prCiQ.data ?? {},
-    isLoading: prsQ.isLoading,
-    isRefreshing: reposQ.isFetching || prsQ.isFetching || ciQ.isFetching || prCiQ.isFetching,
-    error: (prsQ.error ?? reposQ.error) as Error | null,
-    dataUpdatedAt: Math.max(prsQ.dataUpdatedAt, reposQ.dataUpdatedAt),
+    isLoading: headQ.data === undefined && fullQ.data === undefined && (headQ.isLoading || fullQ.isLoading),
+    isRefreshing: reposQ.isFetching || headQ.isFetching || fullQ.isFetching || ciQ.isFetching || prCiQ.isFetching,
+    error: (fullQ.error ?? headQ.error ?? reposQ.error) as Error | null,
+    dataUpdatedAt: Math.max(fullQ.dataUpdatedAt, headQ.dataUpdatedAt, reposQ.dataUpdatedAt),
   };
 }
 
@@ -47,19 +51,21 @@ export function useIssues() {
   const viewer = useViewerUser();
   const login = viewer.data?.login;
   const reposQ = useLiveQuery({ ...reposOptions(token, fp) });
-  const issuesQ = useDeltaSearch<GithubIssue>(
-    { ...allIssuesOptions(token, fp, login) },
+  const headQ = useLiveQuery({ ...allIssuesOptions(token, fp, login, "head") });
+  const fullQ = useDeltaSearch<GithubIssue>(
+    { ...allIssuesOptions(token, fp, login), enabled: !!token && !!login && headQ.data !== undefined },
     "issues",
     (since) => fetchIssueDelta(token!, login!, since),
     (all) => all,
   );
+  const visibleIssues = fullQ.data ?? headQ.data ?? [];
 
   return {
-    issues: (issuesQ.data ?? []).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    issues: [...visibleIssues].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     repos: reposQ.data ?? [],
-    isLoading: issuesQ.isLoading,
-    isRefreshing: reposQ.isFetching || issuesQ.isFetching,
-    error: (issuesQ.error ?? reposQ.error) as Error | null,
-    dataUpdatedAt: Math.max(issuesQ.dataUpdatedAt, reposQ.dataUpdatedAt),
+    isLoading: headQ.data === undefined && fullQ.data === undefined && (headQ.isLoading || fullQ.isLoading),
+    isRefreshing: reposQ.isFetching || headQ.isFetching || fullQ.isFetching,
+    error: (fullQ.error ?? headQ.error ?? reposQ.error) as Error | null,
+    dataUpdatedAt: Math.max(fullQ.dataUpdatedAt, headQ.dataUpdatedAt, reposQ.dataUpdatedAt),
   };
 }
