@@ -14,6 +14,19 @@ import { useLinear } from "@/features/linear/use-linear";
 import { LinearAnalytics } from "@/features/linear/charts";
 import { timeAgo } from "@/lib/utils";
 
+function projectStatusStyle(type?: string) {
+  const colors: Record<string, string> = {
+    backlog: "#8b7cf6",
+    planned: "#5aa9e6",
+    started: "#dbc66f",
+    paused: "#e07a9a",
+    completed: "#7dd3a8",
+    canceled: "#f04848",
+  };
+  const color = colors[type ?? ""] ?? "#8b7cf6";
+  return { borderColor: `${color}88`, backgroundColor: `${color}1f`, color };
+}
+
 export default function LinearPage() {
   const { session, data, isLoading, dataLoading, error, disconnect } = useLinear();
   const searchParams = useSearchParams();
@@ -51,7 +64,7 @@ export default function LinearPage() {
     {disconnectError ? <p className="text-xs text-[var(--destructive)]">{disconnectError}</p> : null}
     <LinearAnalytics issues={visibleIssues} projects={data.projects} />
     <Card accent={19}><CardHeader><CardTitle className="flex items-center gap-2"><FileText className="size-4 text-[var(--primary)]" /> My timesheet</CardTitle><CardDescription>Read-only shortcut to your timesheet document in Linear.</CardDescription></CardHeader><CardContent>{myTimesheet ? <a href={myTimesheet.url} target="_blank" rel="noopener" className="flex items-center gap-2 rounded border border-border bg-background/30 px-3 py-2 text-xs hover:bg-accent"><FileText className="size-3.5 shrink-0 text-[var(--primary)]" /><span className="min-w-0 flex-1 truncate">{myTimesheet.title}</span><span className="shrink-0 text-[10px] text-muted-foreground">updated {timeAgo(myTimesheet.updatedAt)}</span><ExternalLink className="size-3 shrink-0 text-muted-foreground" /></a> : <p className="text-xs text-muted-foreground">No timesheet document was found in the latest Linear documents.</p>}</CardContent></Card>
-    <div className="grid gap-4 lg:grid-cols-[1.1fr_1.4fr]"><Card accent={13}><CardHeader><CardTitle>Projects</CardTitle><CardDescription>Projects visible in the connected Linear workspace.</CardDescription></CardHeader><CardContent className="space-y-1">{data.projects.length ? data.projects.map((project) => <a key={project.id} href={project.url} target="_blank" rel="noopener" className="flex items-center gap-2 rounded px-1.5 py-2 text-xs hover:bg-accent"><Layers3 className="size-3.5 shrink-0 text-[var(--primary)]" /><span className="min-w-0 flex-1 truncate">{project.name}</span><Badge variant="outline">{project.state?.name ?? "No state"}</Badge><ExternalLink className="size-3 text-muted-foreground" /></a>) : <EmptyState title="No projects found" hint="This workspace has no visible projects." />}</CardContent></Card><Card accent={14}><CardHeader><CardTitle>Recent issues</CardTitle><CardDescription>Most recently updated issues, with team and workflow state.</CardDescription></CardHeader><CardContent className="space-y-1">{visibleIssues.length ? visibleIssues.map((issue) => <a key={issue.id} href={issue.url} target="_blank" rel="noopener" className="flex items-center gap-2 rounded px-1.5 py-2 text-xs hover:bg-accent"><span className="w-16 shrink-0 font-mono text-[10px] text-[var(--primary)]">{issue.identifier}</span><span className="min-w-0 flex-1 truncate">{issue.title}</span><Badge variant={issue.state?.type === "completed" ? "success" : issue.state?.type === "canceled" ? "outline" : "info"}>{issue.state?.name ?? "Unknown"}</Badge><span className="hidden w-14 shrink-0 text-right text-[10px] text-muted-foreground sm:inline">{timeAgo(issue.updatedAt)}</span></a>) : <EmptyState title="No issues found" hint="No issues match the selected team." />}</CardContent></Card></div>
+    <div className="grid gap-4 lg:grid-cols-[1.1fr_1.4fr]"><Card accent={13}><CardHeader><CardTitle>Projects</CardTitle><CardDescription>Projects visible in the connected Linear workspace.</CardDescription></CardHeader><CardContent className="space-y-1">{data.projects.length ? data.projects.map((project) => <a key={project.id} href={project.url} target="_blank" rel="noopener" className="flex items-center gap-2 rounded px-1.5 py-2 text-xs hover:bg-accent"><Layers3 className="size-3.5 shrink-0 text-[var(--primary)]" /><span className="min-w-0 flex-1 truncate">{project.name}</span><Badge variant="outline" style={projectStatusStyle(project.state?.type)}>{project.state?.name ?? "No state"}</Badge><ExternalLink className="size-3 text-muted-foreground" /></a>) : <EmptyState title="No projects found" hint="This workspace has no visible projects." />}</CardContent></Card><Card accent={14}><CardHeader><CardTitle>Recent issues</CardTitle><CardDescription>Most recently updated issues, with team and workflow state.</CardDescription></CardHeader><CardContent className="space-y-1">{visibleIssues.length ? visibleIssues.map((issue) => <a key={issue.id} href={issue.url} target="_blank" rel="noopener" className="flex items-center gap-2 rounded px-1.5 py-2 text-xs hover:bg-accent"><span className="w-16 shrink-0 font-mono text-[10px] text-[var(--primary)]">{issue.identifier}</span><span className="min-w-0 flex-1 truncate">{issue.title}</span><Badge variant={issue.state?.type === "completed" ? "success" : issue.state?.type === "canceled" ? "outline" : "info"}>{issue.state?.name ?? "Unknown"}</Badge><span className="hidden w-14 shrink-0 text-right text-[10px] text-muted-foreground sm:inline">{timeAgo(issue.updatedAt)}</span></a>) : <EmptyState title="No issues found" hint="No issues match the selected team." />}</CardContent></Card></div>
   </div>;
 }
 
