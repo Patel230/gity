@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { CheckCircle2, CircleDot, ExternalLink, Layers3, LogOut, Users, Workflow } from "lucide-react";
+import { CheckCircle2, CircleDot, ExternalLink, FileText, Layers3, LogOut, Users, Workflow } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +23,7 @@ export default function LinearPage() {
 
   const visibleIssues = useMemo(() => (data?.issues ?? []).filter((issue) => teamFilter === "all" || issue.team?.key === teamFilter), [data?.issues, teamFilter]);
   const activeIssues = visibleIssues.filter((issue) => !["completed", "canceled"].includes(issue.state?.type ?? ""));
+  const myTimesheet = useMemo(() => data?.documents.find((document) => /timesheet/i.test(document.title) && (!document.creator || !data.viewer || document.creator.name === data.viewer.name)) ?? data?.documents.find((document) => /timesheet/i.test(document.title)), [data]);
   const teamOptions = useMemo(() => [allOption("teams"), ...(data ? textOptions(data.teams.map((team) => team.key), "teams").slice(1).map((option) => ({ ...option, label: `${option.value} · ${data.teams.find((team) => team.key === option.value)?.name ?? option.value}` })) : [])], [data]);
 
   const handleDisconnect = async () => {
@@ -43,6 +44,7 @@ export default function LinearPage() {
     <Card accent={12}><CardContent className="flex flex-col gap-2 pt-3 sm:flex-row sm:items-center"><FilterSelect value={teamFilter} onChange={setTeamFilter} label="Teams" options={teamOptions} wide /><span className="text-xs text-muted-foreground">Showing the latest 100 issues returned by Linear.</span><div className="flex-1" /><Button size="sm" variant="secondary" disabled={disconnecting} onClick={handleDisconnect}><LogOut className="size-3.5" /> {disconnecting ? "Disconnecting…" : "Disconnect"}</Button></CardContent></Card>
     {disconnectError ? <p className="text-xs text-[var(--destructive)]">{disconnectError}</p> : null}
     <LinearAnalytics issues={visibleIssues} projects={data.projects} />
+    <Card accent={19}><CardHeader><CardTitle className="flex items-center gap-2"><FileText className="size-4 text-[var(--primary)]" /> My timesheet</CardTitle><CardDescription>Read-only shortcut to your timesheet document in Linear.</CardDescription></CardHeader><CardContent>{myTimesheet ? <a href={myTimesheet.url} target="_blank" rel="noopener" className="flex items-center gap-2 rounded border border-border bg-background/30 px-3 py-2 text-xs hover:bg-accent"><FileText className="size-3.5 shrink-0 text-[var(--primary)]" /><span className="min-w-0 flex-1 truncate">{myTimesheet.title}</span><span className="shrink-0 text-[10px] text-muted-foreground">updated {timeAgo(myTimesheet.updatedAt)}</span><ExternalLink className="size-3 shrink-0 text-muted-foreground" /></a> : <p className="text-xs text-muted-foreground">No timesheet document was found in the latest Linear documents.</p>}</CardContent></Card>
     <div className="grid gap-4 lg:grid-cols-[1.1fr_1.4fr]"><Card accent={13}><CardHeader><CardTitle>Projects</CardTitle><CardDescription>Projects visible in the connected Linear workspace.</CardDescription></CardHeader><CardContent className="space-y-1">{data.projects.length ? data.projects.map((project) => <a key={project.id} href={project.url} target="_blank" rel="noopener" className="flex items-center gap-2 rounded px-1.5 py-2 text-xs hover:bg-accent"><Layers3 className="size-3.5 shrink-0 text-[var(--primary)]" /><span className="min-w-0 flex-1 truncate">{project.name}</span><Badge variant="outline">{project.state?.name ?? "No state"}</Badge><ExternalLink className="size-3 text-muted-foreground" /></a>) : <EmptyState title="No projects found" hint="This workspace has no visible projects." />}</CardContent></Card><Card accent={14}><CardHeader><CardTitle>Recent issues</CardTitle><CardDescription>Most recently updated issues, with team and workflow state.</CardDescription></CardHeader><CardContent className="space-y-1">{visibleIssues.length ? visibleIssues.map((issue) => <a key={issue.id} href={issue.url} target="_blank" rel="noopener" className="flex items-center gap-2 rounded px-1.5 py-2 text-xs hover:bg-accent"><span className="w-16 shrink-0 font-mono text-[10px] text-[var(--primary)]">{issue.identifier}</span><span className="min-w-0 flex-1 truncate">{issue.title}</span><Badge variant={issue.state?.type === "completed" ? "success" : issue.state?.type === "canceled" ? "outline" : "info"}>{issue.state?.name ?? "Unknown"}</Badge><span className="hidden w-14 shrink-0 text-right text-[10px] text-muted-foreground sm:inline">{timeAgo(issue.updatedAt)}</span></a>) : <EmptyState title="No issues found" hint="No issues match the selected team." />}</CardContent></Card></div>
   </div>;
 }

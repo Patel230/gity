@@ -18,6 +18,11 @@ const LINEAR_QUERY = `query GityLinearData {
     }
   }
 }`;
+const DOCUMENTS_QUERY = `query GityLinearDocuments {
+  documents(first: 50, orderBy: updatedAt) {
+    nodes { id title url updatedAt creator { name } }
+  }
+}`;
 
 type RawData = {
   viewer?: { id: string; name: string | null };
@@ -31,6 +36,7 @@ type RawData = {
     project: { name: string } | null;
   }[] };
 };
+type RawDocuments = { nodes: { id: string; title: string; url: string; updatedAt: string; creator: { name: string } | null }[] };
 
 function json(data: unknown, status = 200): Response {
   return Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
@@ -82,6 +88,24 @@ async function queryLinear(accessToken: string): Promise<RawData> {
   return payload.data;
 }
 
+async function queryLinearDocuments(accessToken: string): Promise<RawDocuments> {
+  const response = await fetch(GRAPHQL_URL, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ query: DOCUMENTS_QUERY }),
+  });
+  let payload: { data?: { documents?: RawDocuments }; errors?: { message?: string }[] };
+  try {
+    payload = await response.json() as { data?: { documents?: RawDocuments }; errors?: { message?: string }[] };
+  } catch {
+    throw new Error("Linear documents request failed");
+  }
+  if (!response.ok || payload.errors?.length || !payload.data?.documents) {
+    throw new Error("Linear documents request failed");
+  }
+  return payload.data.documents;
+}
+
 export async function onRequestGet({ request, env }: { request: Request; env: GityEnv }): Promise<Response> {
   if (!(await getSession(request, env))) return json({ error: "unauthorized" }, 401);
   const context = await getLinearSessionContext(request, env);
@@ -92,6 +116,7 @@ export async function onRequestGet({ request, env }: { request: Request; env: Gi
     accessToken = await refreshToken(env, context.session.userId, context.refreshToken) ?? accessToken;
   }
   let data: RawData;
+  let documents: RawDocuments = { nodes: [] };
   try {
     data = await queryLinear(accessToken);
   } catch {
@@ -104,11 +129,17 @@ export async function onRequestGet({ request, env }: { request: Request; env: Gi
       return json({ error: "linear_request_failed" }, 502);
     }
   }
+  try {
+    documents = await queryLinearDocuments(accessToken);
+  } catch {
+    console.warn("[gity-linear] Documents unavailable; continuing without documents");
+  }
   return json({
     viewer: data.viewer ?? null,
     teams: data.teams?.nodes ?? [],
     projects: (data.projects?.nodes ?? []).map((project) => ({ ...project, state: project.status })),
     issues: data.issues?.nodes ?? [],
+    documents: documents.nodes,
     fetchedAt: Date.now(),
   });
 }

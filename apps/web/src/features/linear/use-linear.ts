@@ -22,12 +22,14 @@ export interface LinearIssue {
   team: { name: string; key: string } | null;
   project: { name: string } | null;
 }
+export interface LinearDocument { id: string; title: string; url: string; updatedAt: string; creator: { name: string } | null }
 
 export interface LinearData {
   viewer: { id: string; name: string | null } | null;
   teams: LinearTeam[];
   projects: LinearProject[];
   issues: LinearIssue[];
+  documents: LinearDocument[];
   fetchedAt: number;
 }
 

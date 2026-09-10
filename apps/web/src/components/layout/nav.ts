@@ -17,7 +17,6 @@ export const NAV = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/organizations", label: "Orgs", icon: Building2 },
   { href: "/graph", label: "Graph", icon: Network },
-  { href: "/linear", label: "Linear", icon: Layers3 },
   { href: "/repositories", label: "Repos", icon: Database },
   { href: "/pull-requests", label: "PRs", icon: GitPullRequest },
   { href: "/issues", label: "Issues", icon: CircleDot },
@@ -25,6 +24,7 @@ export const NAV = [
   { href: "/activity", label: "Activity", icon: Activity },
   { href: "/streak", label: "Streak", icon: Flame },
   { href: "/agents", label: "Agents", icon: Bot },
+  { href: "/linear", label: "Linear", icon: Layers3 },
 ] as const;
 
 export const SETTINGS_NAV = { href: "/settings", label: "Settings", icon: Settings };
