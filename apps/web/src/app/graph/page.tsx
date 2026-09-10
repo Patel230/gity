@@ -34,13 +34,7 @@ import type { GithubRepo, GithubWorkflowRun } from "@/lib/github/types";
 import { formatNumber, timeAgo } from "@/lib/utils";
 
 type GraphView = "topology" | "workflows";
-
-const NODE_WIDTH = 202;
-const NODE_HEIGHT = 96;
-const ORG_WIDTH = 192;
-const ROW_GAP = 24;
-const REPO_GAP = 12;
-const REPOS_PER_ROW = 4;
+type GraphGroup = { login: string; repos: GithubRepo[] };
 
 export default function GraphPage() {
   const { repos, runs, isLoading, error, dataUpdatedAt } = useGraph();
@@ -149,7 +143,7 @@ export default function GraphPage() {
               {graphGroups.length === 0 ? (
                 <EmptyState title="No repositories match" hint="Try All organizations or All repositories." />
               ) : (
-                <TopologyMap groups={graphGroups} selectedRepo={selectedRepo} onSelect={setSelectedRepo} />
+                <TopologyMap groups={graphGroups} selectedRepo={selectedRepo} onSelect={setSelectedRepo} onSelectOrg={chooseOrg} />
               )}
             </CardContent>
           </Card>
@@ -181,58 +175,69 @@ function groupRepos(repos: GithubRepo[]) {
   return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([login, items]) => ({ login, repos: items }));
 }
 
-function TopologyMap({ groups, selectedRepo, onSelect }: { groups: { login: string; repos: GithubRepo[] }[]; selectedRepo: string | null; onSelect: (fullName: string) => void }) {
-  const rowHeight = (repos: GithubRepo[]) => Math.max(132, Math.ceil(repos.length / REPOS_PER_ROW) * (NODE_HEIGHT + REPO_GAP) + 30);
-  const rows = groups.map((group) => ({ ...group, height: rowHeight(group.repos) }));
-  const height = rows.reduce((sum, row) => sum + row.height, 0) + Math.max(0, rows.length - 1) * ROW_GAP;
-  const width = ORG_WIDTH + 54 + REPOS_PER_ROW * NODE_WIDTH + (REPOS_PER_ROW - 1) * REPO_GAP;
+function TopologyMap({ groups, selectedRepo, onSelect, onSelectOrg }: { groups: GraphGroup[]; selectedRepo: string | null; onSelect: (fullName: string) => void; onSelectOrg: (login: string) => void }) {
+  const focused = groups.length === 1;
   return (
-    <div className="overflow-x-auto rounded-md border border-border/70 bg-background/40 p-2">
-      <div className="relative" style={{ width, height }}>
-        <svg className="pointer-events-none absolute inset-0 overflow-visible" width={width} height={height} aria-hidden="true">
-          <defs>
-            <linearGradient id="graph-edge" x1="0" x2="1">
-              <stop offset="0" stopColor="var(--primary)" stopOpacity="0.55" />
-              <stop offset="1" stopColor="var(--border)" stopOpacity="0.75" />
-            </linearGradient>
-          </defs>
-          {rows.map((row, rowIndex) => {
-            const rowTop = rows.slice(0, rowIndex).reduce((sum, item) => sum + item.height + ROW_GAP, 0);
-            return row.repos.map((repo, index) => {
-              const repoX = ORG_WIDTH + 54 + (index % REPOS_PER_ROW) * (NODE_WIDTH + REPO_GAP);
-              const repoY = rowTop + 16 + Math.floor(index / REPOS_PER_ROW) * (NODE_HEIGHT + REPO_GAP) + NODE_HEIGHT / 2;
-              const orgY = rowTop + row.height / 2;
-              return <path key={repo.fullName} d={`M ${ORG_WIDTH} ${orgY} C ${ORG_WIDTH + 26} ${orgY}, ${repoX - 28} ${repoY}, ${repoX} ${repoY}`} fill="none" stroke="url(#graph-edge)" strokeWidth="1.5" />;
-            });
-          })}
-        </svg>
-        {rows.map((row, rowIndex) => {
-          const rowTop = rows.slice(0, rowIndex).reduce((sum, item) => sum + item.height + ROW_GAP, 0);
-          return (
-            <div key={row.login}>
-              <div className="absolute left-0 flex items-center" style={{ top: rowTop, width: ORG_WIDTH, height: row.height }}>
-                <div className="w-full rounded-md border border-[color-mix(in_srgb,var(--primary)_45%,var(--border))] bg-[color-mix(in_srgb,var(--primary)_8%,var(--card))] p-3 shadow-[0_8px_20px_rgba(0,0,0,0.12)]">
-                  <div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded bg-accent text-[var(--primary)]"><Building2 className="size-4" /></span><span className="min-w-0 truncate text-sm font-semibold">{row.login}</span></div>
-                  <p className="mt-2 font-mono text-[11px] text-muted-foreground">{row.repos.length} {row.repos.length === 1 ? "repository" : "repositories"}</p>
-                </div>
-              </div>
-              {row.repos.map((repo, index) => {
-                const repoX = ORG_WIDTH + 54 + (index % REPOS_PER_ROW) * (NODE_WIDTH + REPO_GAP);
-                const repoY = rowTop + 16 + Math.floor(index / REPOS_PER_ROW) * (NODE_HEIGHT + REPO_GAP);
-                return <RepoNode key={repo.fullName} repo={repo} selected={selectedRepo === repo.fullName} onSelect={onSelect} style={{ left: repoX, top: repoY }} />;
-              })}
-            </div>
-          );
-        })}
+    <div className="space-y-3">
+      {focused ? (
+        <FocusedOrganization group={groups[0]} selectedRepo={selectedRepo} onSelect={onSelect} />
+      ) : (
+        <OrganizationOverview groups={groups} onSelectOrg={onSelectOrg} />
+      )}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border/70 pt-2 text-[10px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-[var(--primary)]" /> organization scope</span>
+        <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-[var(--success)]" /> healthy CI</span>
+        <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-[var(--destructive)]" /> failing CI</span>
+        {!focused ? <span className="ml-auto">Select a scope to expand its repositories</span> : <span className="ml-auto">{groups[0].repos.length} repositories in this scope</span>}
       </div>
     </div>
   );
 }
 
-function RepoNode({ repo, selected, onSelect, style }: { repo: GithubRepo; selected: boolean; onSelect: (fullName: string) => void; style: { left: number; top: number } }) {
+function OrganizationOverview({ groups, onSelectOrg }: { groups: GraphGroup[]; onSelectOrg: (login: string) => void }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {groups.map((group) => {
+        const failing = group.repos.filter((repo) => repo.ciState === "failing").length;
+        const openPrs = group.repos.reduce((sum, repo) => sum + repo.openPrCount, 0);
+        const openIssues = group.repos.reduce((sum, repo) => sum + repo.openIssueCount, 0);
+        const languages = [...new Set(group.repos.map((repo) => repo.primaryLanguage).filter(Boolean))].slice(0, 3);
+        return (
+          <button type="button" key={group.login} onClick={() => onSelectOrg(group.login)} className="group rounded-md border border-border bg-card/70 p-3 text-left transition hover:-translate-y-0.5 hover:border-primary/70 hover:bg-card" aria-label={`Expand ${group.login} repositories`}>
+            <div className="flex items-center gap-2"><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent text-[var(--primary)]"><Building2 className="size-4" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{group.login}</span><span className="block text-[10px] text-muted-foreground">{group.repos.length} {group.repos.length === 1 ? "repository" : "repositories"}</span></span><ArrowRight className="size-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]" /></div>
+            <div className="mt-3 flex min-h-6 items-center gap-1 overflow-hidden" aria-hidden="true">
+              {group.repos.slice(0, 12).map((repo) => <span key={repo.fullName} title={repo.name} className={`size-3 shrink-0 rounded-full border border-background ${repo.ciState === "failing" ? "bg-[var(--destructive)]" : repo.ciState === "passing" ? "bg-[var(--success)]" : repo.ciState === "pending" ? "bg-[var(--warning)]" : "bg-[var(--border)]"}`} />)}
+              {group.repos.length > 12 ? <span className="ml-1 text-[10px] text-muted-foreground">+{group.repos.length - 12}</span> : null}
+            </div>
+            <div className="mt-3 flex items-center gap-2 text-[10px] text-muted-foreground"><span className="truncate">{languages.length ? languages.join(" · ") : "Languages undeclared"}</span><span className="ml-auto shrink-0">{failing ? `${failing} failing` : `${openPrs} PRs · ${openIssues} issues`}</span></div>
+            <div className="mt-2 h-0.5 overflow-hidden rounded-full bg-muted"><span className={`block h-full rounded-full ${failing ? "bg-[var(--destructive)]" : "bg-[var(--success)]"}`} style={{ width: `${Math.max(8, ((group.repos.length - failing) / Math.max(1, group.repos.length)) * 100)}%` }} /></div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function FocusedOrganization({ group, selectedRepo, onSelect }: { group: GraphGroup; selectedRepo: string | null; onSelect: (fullName: string) => void }) {
+  const openPrs = group.repos.reduce((sum, repo) => sum + repo.openPrCount, 0);
+  const openIssues = group.repos.reduce((sum, repo) => sum + repo.openIssueCount, 0);
+  return (
+    <div className="rounded-md border border-border/70 bg-background/40 p-3">
+      <div className="grid gap-3 lg:grid-cols-[190px_28px_minmax(0,1fr)] lg:items-center">
+        <div className="rounded-md border border-[color-mix(in_srgb,var(--primary)_45%,var(--border))] bg-[color-mix(in_srgb,var(--primary)_8%,var(--card))] p-3"><div className="flex items-center gap-2"><span className="grid size-8 place-items-center rounded-lg bg-accent text-[var(--primary)]"><Building2 className="size-4" /></span><span className="min-w-0 truncate text-sm font-semibold">{group.login}</span></div><p className="mt-2 text-[10px] text-muted-foreground">{group.repos.length} repos · {openPrs} PRs · {openIssues} issues</p></div>
+        <ArrowRight className="mx-auto hidden size-5 text-[var(--primary)] lg:block" />
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {group.repos.map((repo) => <RepoNode key={repo.fullName} repo={repo} selected={selectedRepo === repo.fullName} onSelect={onSelect} />)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RepoNode({ repo, selected, onSelect }: { repo: GithubRepo; selected: boolean; onSelect: (fullName: string) => void }) {
   const ci = repo.ciState;
   return (
-    <button type="button" onClick={() => onSelect(repo.fullName)} className={`absolute rounded-md border bg-card p-2.5 text-left shadow-[0_8px_20px_rgba(0,0,0,0.12)] transition hover:-translate-y-0.5 hover:border-primary/70 ${selected ? "border-primary ring-2 ring-primary/25" : "border-border"}`} style={{ ...style, width: NODE_WIDTH, height: NODE_HEIGHT }} aria-label={`Inspect ${repo.fullName}`}>
+    <button type="button" onClick={() => onSelect(repo.fullName)} className={`min-h-[92px] rounded-md border bg-card p-2.5 text-left shadow-[0_8px_20px_rgba(0,0,0,0.12)] transition hover:-translate-y-0.5 hover:border-primary/70 ${selected ? "border-primary ring-2 ring-primary/25" : "border-border"}`} aria-label={`Inspect ${repo.fullName}`}>
       <span className="flex items-start gap-2"><span className="grid size-6 shrink-0 place-items-center rounded bg-accent text-[var(--primary)]"><Database className="size-3.5" /></span><span className="min-w-0 flex-1"><span className="block truncate font-mono text-xs font-semibold">{repo.name}</span><span className="block truncate text-[10px] text-muted-foreground">{repo.ownerLogin}</span></span>{repo.isPrivate ? <LockKeyhole className="size-3 text-muted-foreground" /> : null}</span>
       <span className="mt-2 flex items-center justify-between gap-2"><span className="truncate text-[10px] text-muted-foreground">{repo.primaryLanguage ?? "No language"}</span><CiBadge state={ci} /></span>
     </button>
