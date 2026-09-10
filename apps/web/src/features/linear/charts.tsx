@@ -14,6 +14,16 @@ const chartColors = ["var(--primary)", "var(--success)", "var(--warning)", "#8b7
 
 type CountDatum = { name: string; count: number; color?: string | null };
 
+function statusColor(name: string): string {
+  const normalized = name.toLowerCase().replace(/[\s_-]+/g, "");
+  if (["done", "completed", "complete", "resolved"].includes(normalized)) return "var(--success)";
+  if (["canceled", "cancelled", "closed", "duplicate"].includes(normalized)) return "var(--destructive)";
+  if (["inprogress", "started", "active"].includes(normalized)) return "var(--warning)";
+  if (["planned", "triage", "todo"].includes(normalized)) return "#5aa9e6";
+  if (["paused", "blocked"].includes(normalized)) return "#e07a9a";
+  return "#8b7cf6";
+}
+
 function groupedCounts(values: string[], limit = 7): CountDatum[] {
   const counts = new Map<string, number>();
   values.forEach((value) => counts.set(value, (counts.get(value) ?? 0) + 1));
@@ -37,7 +47,9 @@ function HorizontalBars({ data }: { data: CountDatum[] }) {
           <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} />
           <YAxis type="category" dataKey="name" width={88} tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} tickFormatter={(value: string) => value.length > 14 ? `${value.slice(0, 13)}…` : value} />
           <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "var(--foreground)" }} cursor={{ fill: "var(--accent)" }} />
-          <Bar dataKey="count" name="Issues" fill="var(--primary)" radius={[0, 3, 3, 0]} />
+          <Bar dataKey="count" name="Issues" radius={[0, 3, 3, 0]}>
+            {data.map((entry, index) => <Cell key={entry.name} fill={entry.color || chartColors[index % chartColors.length]} />)}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -47,25 +59,30 @@ function HorizontalBars({ data }: { data: CountDatum[] }) {
 function IssueStatusChart({ data }: { data: CountDatum[] }) {
   if (!data.length) return <ChartEmpty />;
   return (
-    <div className="h-44">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="space-y-1">
+      <div className="h-32">
+        <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie data={data} dataKey="count" nameKey="name" cx="50%" cy="50%" innerRadius={46} outerRadius={72} paddingAngle={2} stroke="var(--card)" strokeWidth={2}>
             {data.map((entry, index) => <Cell key={entry.name} fill={entry.color || chartColors[index % chartColors.length]} />)}
           </Pie>
           <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "var(--foreground)" }} />
         </PieChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1">
+        {data.map((entry, index) => <span key={entry.name} className="flex items-center gap-1 text-[10px] text-muted-foreground"><span className="size-1.5 rounded-full" style={{ backgroundColor: entry.color || chartColors[index % chartColors.length] }} />{entry.name} · {entry.count}</span>)}
+      </div>
     </div>
   );
 }
 
 export function LinearAnalytics({ issues, projects }: { issues: LinearIssue[]; projects: LinearProject[] }) {
   const statuses = [...new Map(issues.map((issue) => [issue.state?.name ?? "No status", issue.state?.color])).entries()]
-    .map(([name, color]) => ({ name, count: issues.filter((issue) => (issue.state?.name ?? "No status") === name).length, color }));
-  const assignees = groupedCounts(issues.map((issue) => issue.assignee?.name ?? "Unassigned"));
-  const teams = groupedCounts(issues.map((issue) => issue.team?.key ?? "No team"));
-  const projectStatuses = groupedCounts(projects.map((project) => project.state?.name ?? "No status"));
+    .map(([name, color]) => ({ name, count: issues.filter((issue) => (issue.state?.name ?? "No status") === name).length, color: color || statusColor(name) }));
+  const assignees = groupedCounts(issues.map((issue) => issue.assignee?.name ?? "Unassigned")).map((entry, index) => ({ ...entry, color: chartColors[index % chartColors.length] }));
+  const teams = groupedCounts(issues.map((issue) => issue.team?.key ?? "No team")).map((entry, index) => ({ ...entry, color: chartColors[(index + 2) % chartColors.length] }));
+  const projectStatuses = groupedCounts(projects.map((project) => project.state?.name ?? "No status")).map((entry) => ({ ...entry, color: statusColor(entry.name) }));
 
   return (
     <section className="space-y-2" aria-label="Linear analytics">
