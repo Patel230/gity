@@ -41,9 +41,12 @@ export function useLinear() {
   const sessionQ = useLiveQuery<LinearSession, Error>({
     queryKey: ["gity", "linear", "session"],
     queryFn: () => getJson<LinearSession>("/api/linear/session"),
-    staleTime: 5 * 60_000,
+    // Connection state can change outside this tab during OAuth; always
+    // validate it when the Linear page mounts instead of trusting persisted data.
+    staleTime: 0,
     gcTime: 15 * 60_000,
     refetchInterval: 5 * 60_000,
+    refetchOnMount: "always",
     retry: false,
   });
   const dataQ = useLiveQuery<LinearData, Error>({
@@ -53,6 +56,7 @@ export function useLinear() {
     staleTime: 60_000,
     gcTime: 10 * 60_000,
     refetchInterval: 5 * 60_000,
+    refetchOnMount: "always",
     retry: 1,
   });
   const disconnect = async () => {
