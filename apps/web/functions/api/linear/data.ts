@@ -7,7 +7,7 @@ const GRAPHQL_URL = "https://api.linear.app/graphql";
 const LINEAR_QUERY = `query GityLinearData {
   viewer { id name }
   teams(first: 50) { nodes { id name key color } }
-  projects(first: 50, orderBy: updatedAt) { nodes { id name url state { name type } } }
+  projects(first: 50) { nodes { id name url state { name type } } }
   issues(first: 100, orderBy: updatedAt) {
     nodes {
       id identifier title url createdAt updatedAt
