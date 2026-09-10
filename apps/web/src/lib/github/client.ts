@@ -40,6 +40,35 @@ async function proxyFetch(url: string, init: RequestInit): Promise<Response> {
   return fetch(`/api/github?url=${encodeURIComponent(url)}`, init);
 }
 
+function isGatewayError(status: number): boolean {
+  return status === 502 || status === 503 || status === 504;
+}
+
+/**
+ * A relay can return an HTTP gateway error even when the browser can reach
+ * GitHub. Try the other transport in that case, while preserving real GitHub
+ * responses such as 401/403 for the normal error classifier.
+ */
+async function fetchWithGatewayFallback(
+  primary: () => Promise<Response>,
+  fallback: () => Promise<Response>,
+): Promise<Response> {
+  let response: Response;
+  try {
+    response = await primary();
+  } catch {
+    return fallback();
+  }
+  if (!isGatewayError(response.status)) return response;
+
+  try {
+    const fallbackResponse = await fallback();
+    return isGatewayError(fallbackResponse.status) ? response : fallbackResponse;
+  } catch {
+    return response;
+  }
+}
+
 function classifyRestError(res: Response, message: string): GithubApiError {
   const msg = message || `GitHub request failed (${res.status}).`;
   if (res.status === 403) {
@@ -84,24 +113,21 @@ export async function restFetch<T>(
     }
   }
   let res: Response;
+  const requestInit = {
+    ...init,
+    headers: { ...authHeaders(token), ...(init?.headers ?? {}) },
+  };
   try {
-    res = await fetch(url.toString(), {
-      ...init,
-      headers: { ...authHeaders(token), ...(init?.headers ?? {}) },
-    });
+    res = await fetchWithGatewayFallback(
+      () => fetch(url.toString(), requestInit),
+      () => proxyFetch(url.toString(), requestInit),
+    );
   } catch {
-    try {
-      res = await proxyFetch(url.toString(), {
-        ...init,
-        headers: { ...authHeaders(token), ...(init?.headers ?? {}) },
-      });
-    } catch {
-      throw new GithubApiError(
-        "blocked",
-        0,
-        "GitHub could not be reached directly or through Gity's relay. Check your network, VPN, firewall, or browser extensions, then retry.",
-      );
-    }
+    throw new GithubApiError(
+      "blocked",
+      0,
+      "GitHub could not be reached directly or through Gity's relay. Check your network, VPN, firewall, or browser extensions, then retry.",
+    );
   }
   recordRestRateLimit(res.headers);
   if (!res.ok) throw classifyRestError(res, await readErrorMessage(res));
@@ -157,32 +183,28 @@ export async function graphqlFetch<T>(
   variables?: Record<string, unknown>,
 ): Promise<T> {
   let res: Response;
+  const requestInit: RequestInit = {
+    method: "POST",
+    headers: {
+      ...authHeaders(token),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ query, variables }),
+  };
   try {
     // GitHub's GraphQL endpoint does not reliably expose CORS headers for
     // browser requests. Use our same-origin relay first to avoid a noisy,
     // failed cross-origin request on every page load.
-    res = await proxyFetch(GRAPHQL_URL, {
-      method: "POST",
-      headers: {
-        ...authHeaders(token),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ query, variables }),
-    });
+    res = await fetchWithGatewayFallback(
+      () => proxyFetch(GRAPHQL_URL, requestInit),
+      () => fetch(GRAPHQL_URL, requestInit),
+    );
   } catch {
-    try {
-      res = await fetch(GRAPHQL_URL, {
-        method: "POST",
-        headers: { ...authHeaders(token), "Content-Type": "application/json" },
-        body: JSON.stringify({ query, variables }),
-      });
-    } catch {
-      throw new GithubApiError(
-        "blocked",
-        0,
-        "GitHub could not be reached directly or through Gity's relay. Check your network, VPN, firewall, or browser extensions, then retry.",
-      );
-    }
+    throw new GithubApiError(
+      "blocked",
+      0,
+      "GitHub could not be reached directly or through Gity's relay. Check your network, VPN, firewall, or browser extensions, then retry.",
+    );
   }
   recordRestRateLimit(res.headers, "rest");
   if (res.status === 401)
