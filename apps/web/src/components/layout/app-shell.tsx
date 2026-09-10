@@ -95,7 +95,11 @@ function SidebarBody({ collapsed = false, onToggle, onNavigate, showToggle = tru
             onClick={() => onToggle?.()}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-pressed={collapsed}
+            className={cn(
+              "flex min-h-10 w-full items-center rounded-lg px-1 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              collapsed ? "justify-center" : "justify-start",
+            )}
           >
             <BrandLogo showName={!collapsed} />
           </button>
