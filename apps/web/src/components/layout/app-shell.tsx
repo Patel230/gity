@@ -13,7 +13,6 @@ import { CommandPalette } from "./command-palette";
 import { BrandLogo } from "./brand-logo";
 import { NAV } from "./nav";
 import { RateLimitBadge } from "@/components/common/rate-limit";
-import { RefreshControl } from "@/components/common/refresh-control";
 import { TokenGate } from "@/components/common/token-gate";
 import { usePaletteData } from "@/features/search/use-palette";
 import { GithubStarLink } from "@/components/common/github-star";
@@ -110,7 +109,6 @@ function Header({ onMenu }: { onMenu: () => void }) {
       <div className="flex-1" />
       <CommandPalette data={palette} />
       <RateLimitBadge />
-      <RefreshControl />
       <Button
         size="icon"
         variant="ghost"

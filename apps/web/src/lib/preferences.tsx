@@ -1,7 +1,6 @@
 /**
  * User preferences: named dark theme + Live Refresh polling.
- * Live Refresh is polling, not true real-time — there are no webhooks
- * and no backend in Gity by design.
+ * Live Refresh is polling, not true real-time — there are no webhooks.
  */
 "use client";
 

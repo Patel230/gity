@@ -128,7 +128,7 @@ export function SettingsPage({ embedded = false, section }: { embedded?: boolean
       {(!section || section === "refresh") && <Card accent={13}>
         <CardHeader>
           <CardTitle>Live Refresh</CardTitle>
-          <CardDescription>Polling — not true real-time. Workflow runs and recent activity poll on this interval; heavier data (repos, PRs, issues, CI) refreshes on page open, window focus, and manual Refresh to protect GitHub rate limits.</CardDescription>
+          <CardDescription>Polling — not true real-time. Workflow runs and recent activity poll on this interval; heavier data (repos, PRs, issues, CI) refreshes automatically every 15 minutes to protect GitHub rate limits.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2">

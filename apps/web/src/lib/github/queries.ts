@@ -97,13 +97,14 @@ function searchQuery(kind: "pr" | "issue", login: string, depth: SearchDepth): s
  * Refresh tiers.
  * - LIVE (workflow runs, events): follow the user's Live Refresh poll — cheap
  *   REST calls with high signal value, so they stay on the 15s–5m interval.
- * - CALM (everything else): refresh on mount, window-focus, and manual
- *   Refresh only — never on the interval. A 30s poll on the repos query alone
- *   (~600 GraphQL points) would burn the 5,000/hr budget in minutes and stall
- *   the whole app on 429s. Spread CALM into a builder's options to opt out.
+ * - CALM (everything else): refresh automatically every 15 minutes. This keeps
+ *   the dashboard current without a user-facing refresh control or a 30s poll
+ *   on the repos query (~600 GraphQL points), which could burn the budget in
+ *   minutes and stall the whole app on 429s.
  */
+const CALM_REFRESH_MS = 15 * 60_000;
 const CALM = {
-  refetchInterval: false as const,
+  refetchInterval: CALM_REFRESH_MS,
   refetchOnWindowFocus: false,
   refetchOnReconnect: false,
 };

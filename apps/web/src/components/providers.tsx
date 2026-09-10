@@ -21,8 +21,8 @@ export function Providers({ children }: { children: ReactNode }) {
         defaultOptions: {
           queries: {
             // Smart refresh: LIVE-tier queries (runs, events) poll on the
-            // user's interval; CALM-tier queries refresh on mount, window
-            // focus, reconnect, and manual Refresh only.
+            // user's interval; CALM-tier options set a slower 15-minute
+            // interval for heavier GitHub reads.
             refetchOnWindowFocus: true,
             refetchOnReconnect: true,
             refetchOnMount: true,

@@ -122,11 +122,11 @@ so true real-time is impossible for a frontend. Gity instead implements
 
 - **Live tier** (workflow runs, recent activity): polls on your interval while the
   tab is active. These are cheap REST calls with the highest signal value.
-- **Calm tier** (repos, PRs, issues, CI, contributions): refreshes on page open,
-  window focus/reconnect, and manual Refresh — never on the interval. A 30s poll
-  on the repos query alone would burn the 5,000/hr GraphQL budget in minutes.
-- A manual **Refresh** button invalidates all queries while preserving incremental-sync markers;
-  header shows `Updated Xs ago`.
+- **Calm tier** (repos, PRs, issues, CI, contributions): refreshes automatically every
+  15 minutes. A 30s poll on the repos query alone would burn the 5,000/hr GraphQL budget
+  in minutes.
+- There is no manual refresh control: persisted data paints immediately and automatic
+  incremental sync keeps it current without forcing full-history reloads.
 - Interval configurable in Settings: **Off / 15s / 30s / 60s / 5 min**.
 - Last session's data is cached in the browser, so revisits paint instantly and
   then quietly revalidate live from GitHub in the background.
