@@ -3,8 +3,8 @@
  * first complete fetch we record WHEN it happened; later syncs fetch only
  * items updated since that day (`updated:>=YYYY-MM-DD`) and merge by id.
  * Day granularity (not timestamp) with id-merge makes same-day overlap
- * harmless. Markers survive manual refreshes so a transient error never
- * turns a normal retry into an expensive full-history scan.
+ * harmless. Markers survive transient failures so automatic retries never
+ * turn a normal refresh into an expensive full-history scan.
  */
 "use client";
 
