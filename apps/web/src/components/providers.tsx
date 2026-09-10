@@ -44,7 +44,9 @@ export function Providers({ children }: { children: ReactNode }) {
       persistOptions={{
         persister,
         maxAge: 12 * 60 * 60 * 1000,
-        buster: "gity-v2",
+        // Bump when server-side configuration changes could make a persisted
+        // client response incorrect (for example, Linear OAuth becoming enabled).
+        buster: "gity-v3-linear-config",
         dehydrateOptions: {
           shouldDehydrateQuery: (q) => q.state.status === "success",
         },
