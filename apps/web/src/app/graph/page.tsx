@@ -37,8 +37,8 @@ type GraphView = "topology" | "workflows";
 type GraphGroup = { login: string; repos: GithubRepo[] };
 
 export default function GraphPage() {
-  const { repos, runs, isLoading, error, dataUpdatedAt } = useGraph();
   const [view, setView] = useState<GraphView>("topology");
+  const { repos, runs, isLoading, runsLoading, error, dataUpdatedAt } = useGraph(view === "workflows");
   const [orgFilter, setOrgFilter] = useState("all");
   const [repoFilter, setRepoFilter] = useState("all");
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
@@ -151,7 +151,7 @@ export default function GraphPage() {
           {selected ? <RepositoryInspector repo={selected} run={latestRuns.get(selected.fullName)} onClose={() => setSelectedRepo(null)} /> : null}
         </>
       ) : (
-        <WorkflowFlow runs={visibleRuns} latestRuns={latestRuns} />
+        <WorkflowFlow runs={visibleRuns} latestRuns={latestRuns} isLoading={runsLoading} />
       )}
     </div>
   );
@@ -301,14 +301,14 @@ function InspectorItem({ icon: Icon, label, value }: { icon: typeof GitBranch; l
   return <div className="flex items-center gap-2 rounded-md border border-border/70 bg-background/35 p-2.5"><Icon className="size-3.5 text-[var(--primary)]" /><span><span className="block text-[10px] text-muted-foreground">{label}</span><span className="block truncate font-mono text-xs">{value}</span></span></div>;
 }
 
-function WorkflowFlow({ runs, latestRuns }: { runs: GithubWorkflowRun[]; latestRuns: Map<string, GithubWorkflowRun> }) {
+function WorkflowFlow({ runs, latestRuns, isLoading }: { runs: GithubWorkflowRun[]; latestRuns: Map<string, GithubWorkflowRun>; isLoading: boolean }) {
   const active = runs.filter((run) => run.status === "in_progress" || run.status === "queued");
   const ordered = [...active, ...[...latestRuns.values()].filter((run) => !active.some((item) => item.id === run.id))];
   return (
     <Card accent={10}>
       <CardHeader><CardTitle>Workflow flow</CardTitle><CardDescription>Event → workflow → result for the latest Actions snapshot available across the selected repositories. Active runs are highlighted and refresh with your workspace preference.</CardDescription></CardHeader>
       <CardContent className="space-y-2">
-        {ordered.length === 0 ? <EmptyState title="No workflow runs found" hint="The selected repositories have no Actions runs visible to your token." /> : ordered.map((run) => <WorkflowLane key={run.id} run={run} />)}
+        {isLoading && ordered.length === 0 ? <div className="flex items-center gap-2 rounded-md border border-border/70 bg-background/25 px-3 py-5 text-xs text-muted-foreground"><LoaderCircle className="size-4 animate-spin text-[var(--primary)]" />Loading workflow snapshot…</div> : ordered.length === 0 ? <EmptyState title="No workflow runs found" hint="The selected repositories have no Actions runs visible to your token." /> : ordered.map((run) => <WorkflowLane key={run.id} run={run} />)}
       </CardContent>
     </Card>
   );
