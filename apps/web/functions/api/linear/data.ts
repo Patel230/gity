@@ -63,7 +63,10 @@ async function queryLinear(accessToken: string): Promise<RawData> {
     body: JSON.stringify({ query: LINEAR_QUERY }),
   });
   const payload = await response.json() as { data?: RawData; errors?: { message?: string }[] };
-  if (!response.ok || payload.errors?.length || !payload.data) throw new Error("Linear data request failed");
+  if (!response.ok || payload.errors?.length || !payload.data) {
+    console.error("[gity-linear] GraphQL request failed", response.status, JSON.stringify(payload.errors ?? []).slice(0, 1200));
+    throw new Error("Linear data request failed");
+  }
   return payload.data;
 }
 
