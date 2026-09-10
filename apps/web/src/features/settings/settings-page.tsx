@@ -24,7 +24,7 @@ export default function SettingsRoute() {
 
 export function SettingsPage({ embedded = false, section }: { embedded?: boolean; section?: SettingsSection } = {}) {
   if (!embedded) redirect("/profile");
-  const { token, storageMode, setToken, clearToken } = useAuth();
+  const { token, serverSession, storageMode, setToken, clearToken } = useAuth();
   const viewer = useViewerUser();
   const { theme, setTheme, appearance, setAppearance, poll, setPoll } = usePrefs();
   const [draft, setDraft] = useState("");
@@ -54,11 +54,14 @@ export function SettingsPage({ embedded = false, section }: { embedded?: boolean
       <div className="flex gap-2 rounded-md border border-[color-mix(in_srgb,var(--warning)_50%,var(--border))] bg-[color-mix(in_srgb,var(--warning)_8%,transparent)] p-3 text-xs leading-relaxed text-muted-foreground">
         <ShieldAlert className="mt-0.5 size-4 shrink-0 text-[var(--warning)]" />
         <span>
-          <strong className="text-foreground">Your token is stored only in this browser</strong> and is sent
-          to GitHub directly, or through Gity&apos;s short-lived relay when your browser blocks direct access.
-          Use Gity on a trusted device, never share this browser profile, and prefer a fine-grained token
-          with the minimum read permissions. For team or public deployments, use a server-side
-          authentication flow.
+          {serverSession ? (
+            <><strong className="text-foreground">Your OAuth credentials stay server-side</strong> in an encrypted
+            session and are never exposed to browser storage. The session renews automatically.</>
+          ) : (
+            <><strong className="text-foreground">Your PAT is stored only in this browser</strong> and is sent
+            to GitHub directly, or through Gity&apos;s short-lived relay. Use a trusted device and prefer
+            a fine-grained token with minimum read permissions.</>
+          )}
         </span>
       </div>
 
@@ -66,12 +69,14 @@ export function SettingsPage({ embedded = false, section }: { embedded?: boolean
 
       <Card accent={12}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><KeyRound className="size-4" /> GitHub token</CardTitle>
+          <CardTitle className="flex items-center gap-2"><KeyRound className="size-4" /> {serverSession ? "GitHub session" : "GitHub token"}</CardTitle>
           <CardDescription>
-            {token ? (
+            {serverSession ? (
+              <>Encrypted server session · authenticated as <strong>{serverSession.login}</strong></>
+            ) : token ? (
               <>Stored ({storageMode === "local" ? "localStorage — persists" : "sessionStorage — this tab only"}) · {viewer.data ? <>authenticated as <strong>{viewer.data.login}</strong></> : "validating…"}</>
             ) : (
-              "No token stored."
+              "No PAT stored."
             )}
           </CardDescription>
         </CardHeader>

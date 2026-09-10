@@ -8,6 +8,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ErrorState } from "@/components/common/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth, useViewerUser } from "@/lib/auth";
@@ -15,7 +16,7 @@ import { usePrefs } from "@/lib/preferences";
 
 export default function ProfilePage() {
   const viewer = useViewerUser();
-  const { storageMode, clearToken } = useAuth();
+  const { storageMode, serverSession, clearToken } = useAuth();
   const { appearance } = usePrefs();
   const [activeTab, setActiveTab] = useState<"profile" | SettingsSection>("profile");
 
@@ -28,13 +29,15 @@ export default function ProfilePage() {
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <PageHead title="Profile" sub="Your GitHub identity and workspace" />
-      <div className="flex border-b border-border/70">
-        <button onClick={() => setActiveTab("profile")} className={`border-b-2 px-3 py-2 text-xs font-medium ${activeTab === "profile" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Profile</button>
-        <button onClick={() => setActiveTab("access")} className={`border-b-2 px-3 py-2 text-xs font-medium ${activeTab === "access" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Access</button>
-        <button onClick={() => setActiveTab("appearance")} className={`border-b-2 px-3 py-2 text-xs font-medium ${activeTab === "appearance" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Appearance</button>
-        <button onClick={() => setActiveTab("refresh")} className={`border-b-2 px-3 py-2 text-xs font-medium ${activeTab === "refresh" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Refresh</button>
-        <button onClick={() => setActiveTab("github")} className={`border-b-2 px-3 py-2 text-xs font-medium ${activeTab === "github" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>GitHub</button>
-      </div>
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "profile" | SettingsSection)}>
+        <TabsList className="max-w-full overflow-x-auto">
+          <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="access">Access</TabsTrigger>
+          <TabsTrigger value="appearance">Appearance</TabsTrigger>
+          <TabsTrigger value="refresh">Auto refresh</TabsTrigger>
+          <TabsTrigger value="github">GitHub</TabsTrigger>
+        </TabsList>
+      </Tabs>
       {activeTab !== "profile" ? (
         <div className="pt-1"><SettingsPage embedded section={activeTab} /></div>
       ) : (
@@ -52,11 +55,11 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
       <div className="grid gap-3 sm:grid-cols-3">
-        <InfoCard icon={ShieldCheck} label="Connection" value="GitHub API" detail="Direct from browser" accent={19} />
-        <InfoCard icon={KeyRound} label="Token storage" value={storageMode === "local" ? "Persistent" : "This tab"} detail={storageMode === "local" ? "localStorage" : "sessionStorage"} accent={20} />
+        <InfoCard icon={ShieldCheck} label="Connection" value="GitHub API" detail={serverSession ? "Encrypted server session" : "PAT direct / relay"} accent={19} />
+        <InfoCard icon={KeyRound} label="Credential" value={serverSession ? "Server session" : storageMode === "local" ? "Persistent PAT" : "This-tab PAT"} detail={serverSession ? "Stored encrypted in D1" : storageMode === "local" ? "localStorage" : "sessionStorage"} accent={20} />
         <InfoCard icon={Palette} label="Appearance" value={appearance === "dark" ? "Dark mode" : "Light mode"} detail="Controlled by toggle" accent={1} />
       </div>
-      <Card accent={2}><CardHeader><CardTitle>Private by design</CardTitle><CardDescription>Your credential stays in this browser and is forwarded only for GitHub requests.</CardDescription></CardHeader><CardContent className="text-xs text-muted-foreground">Your account and workspace controls now live together on this page.</CardContent></Card>
+      <Card accent={2}><CardHeader><CardTitle>Private by design</CardTitle><CardDescription>{serverSession ? "OAuth credentials stay encrypted on the server and are never exposed to the browser." : "PAT credentials stay in this browser and are forwarded only for GitHub requests."}</CardDescription></CardHeader><CardContent className="text-xs text-muted-foreground">Your account and workspace controls now live together on this page.</CardContent></Card>
         </>
       )}
     </div>

@@ -41,8 +41,8 @@ export function mergeById<T extends { id: string }>(prev: T[], delta: T[]): T[] 
  * - Later runs: fetch only items updated since the marker day, merge by id,
  *   apply the bucket filter. One fast page instead of up to ten slow ones.
  * - Delta failure keeps the last successful snapshot in React Query while
- *   preserving the error state, so the UI can warn users instead of showing
- *   stale data as healthy. Manual refresh remains incremental.
+ *   preserving the error state, so the UI can continue showing the last good
+ *   data while automatic refresh retries incrementally.
  */
 export function useDeltaSearch<T extends { id: string }>(
   options: Parameters<typeof useLiveQuery<T[]>>[0],
