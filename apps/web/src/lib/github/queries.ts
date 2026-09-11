@@ -112,8 +112,12 @@ function searchQuery(kind: "pr" | "issue", login: string, depth: SearchDepth): s
 
 /**
  * Refresh tiers.
- * - LIVE (workflow runs, events): follow the user's Live Refresh poll — cheap
- *   REST calls with high signal value, so they stay on the 15s–5m interval.
+ * - LIVE (recent activity): follows the user's Live Refresh poll — a cheap
+ *   single REST call with high signal value, so it stays on the 15s–5m interval.
+ * - LIVE FLOORED (workflow runs): one REST call per repo per tick, so the
+ *   fan-out poll never runs hotter than RUNS_POLL_FLOOR_MS even when the user
+ *   picks 15s/30s. Otherwise large workspaces burn the 5,000/hr REST budget
+ *   and flip pages between content and rate-limit error states.
  * - CALM (everything else): refresh automatically every 15 minutes. This keeps
  *   the dashboard current without a user-facing refresh control or a 30s poll
  *   on the repos query (~600 GraphQL points), which could burn the budget in
@@ -125,6 +129,14 @@ const CALM = {
   refetchOnWindowFocus: false,
   refetchOnReconnect: false,
 };
+
+/**
+ * Floor for the workflow-runs fan-out poll. One tick costs one REST call per
+ * repo (up to 30), so letting it follow a 15s/30s live interval burns the
+ * 5,000/hr REST budget and flips pages between content and rate-limit error
+ * states. Single-call live queries (events) still follow the user interval.
+ */
+export const RUNS_POLL_FLOOR_MS = 60_000;
 
 /**
  * Retry policy: transient failures (network hiccups, GitHub 5xx) get a second
@@ -534,6 +546,9 @@ export function workflowRunsOptions(
   const ids = targets.map((r) => r.fullName).join(",");
   return queryOptions<GithubWorkflowRun[], GithubApiError>({
     queryKey: [...qk.workflowRuns(fp), ids],
+    // A 20–30-call fan-out must not fire on every tab switch; the poll
+    // interval (floored at the call site) covers freshness.
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const out: GithubWorkflowRun[] = [];
       const queue = [...targets];

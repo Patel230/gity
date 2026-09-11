@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useAuth, useViewerUser } from "@/lib/auth";
+import { usePrefs } from "@/lib/preferences";
 import {
   ciStatesOptions,
   contributionsOptions,
@@ -11,6 +12,7 @@ import {
   openPrsOptions,
   orgsOptions,
   reposOptions,
+  RUNS_POLL_FLOOR_MS,
   workflowRunsOptions,
 } from "@/lib/github/queries";
 import { startOfDay, toYMD } from "@/lib/utils";
@@ -23,6 +25,7 @@ import { useLiveQuery } from "../use-github";
 export function useOverview() {
   const [now] = useState(() => Date.now());
   const { token, fingerprint: fp } = useAuth();
+  const { refreshInterval } = usePrefs();
   const viewer = useViewerUser();
   const login = viewer.data?.login;
 
@@ -31,7 +34,11 @@ export function useOverview() {
   const openPrsQ = useLiveQuery({ ...openPrsOptions(token, fp, login, reposQ.data, "head") });
   const mergedPrsQ = useLiveQuery({ ...mergedPrsOptions(token, fp, login, "head") });
   const issuesQ = useLiveQuery({ ...allIssuesOptions(token, fp, login, "head") });
-  const runsQ = useLiveQuery({ ...workflowRunsOptions(token, fp, reposQ.data) });
+  const runsQ = useLiveQuery({
+    ...workflowRunsOptions(token, fp, reposQ.data),
+    // Floor the fan-out poll: one REST call per repo per tick.
+    refetchInterval: refreshInterval === false ? false : Math.max(refreshInterval, RUNS_POLL_FLOOR_MS),
+  });
   const eventsQ = useLiveQuery({ ...eventsOptions(token, fp, login) });
   const ciQ = useLiveQuery({ ...ciStatesOptions(token, fp, reposQ.data) });
   const contribQ = useLiveQuery({

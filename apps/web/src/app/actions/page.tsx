@@ -13,7 +13,7 @@ import type { GithubWorkflowRun } from "@/lib/github/types";
 import { timeAgo } from "@/lib/utils";
 
 export default function ActionsPage() {
-  const { failed, running, queued, succeeded, latestPerRepo, isLoading, error } = useActions();
+  const { failed, running, queued, succeeded, latestPerRepo, isLoading, error, runsError } = useActions();
 
   if (isLoading) {
     return (
@@ -33,6 +33,7 @@ export default function ActionsPage() {
   return (
     <div className="space-y-4">
       <PageHead title="Actions" sub="Latest workflow run per repo · failed first · click to open on GitHub" />
+      {runsError ? <p className="rounded-md border border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] bg-[color-mix(in_srgb,var(--warning)_6%,transparent)] px-3 py-2 text-xs text-muted-foreground">Live runs are temporarily unavailable — showing the last snapshot. It refreshes automatically.</p> : null}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <StatCard label="Failed" value={failed.length} icon={XCircle} tone={failed.length ? "destructive" : "default"} />
         <StatCard label="Running" value={running.length} icon={Loader} tone="info" />

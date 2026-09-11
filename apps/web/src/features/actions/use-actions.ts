@@ -1,13 +1,19 @@
 "use client";
 
 import { useAuth } from "@/lib/auth";
-import { reposOptions, workflowRunsOptions } from "@/lib/github/queries";
+import { usePrefs } from "@/lib/preferences";
+import { RUNS_POLL_FLOOR_MS, reposOptions, workflowRunsOptions } from "@/lib/github/queries";
 import { useLiveQuery } from "../use-github";
 
 export function useActions() {
   const { token, fingerprint: fp } = useAuth();
+  const { refreshInterval } = usePrefs();
   const reposQ = useLiveQuery({ ...reposOptions(token, fp) });
-  const runsQ = useLiveQuery({ ...workflowRunsOptions(token, fp, reposQ.data) });
+  const runsQ = useLiveQuery({
+    ...workflowRunsOptions(token, fp, reposQ.data),
+    // Floor the fan-out poll: one REST call per repo per tick.
+    refetchInterval: refreshInterval === false ? false : Math.max(refreshInterval, RUNS_POLL_FLOOR_MS),
+  });
 
   const runs = runsQ.data ?? [];
   const failed = runs.filter((r) => r.conclusion === "failure" || r.conclusion === "timed_out");
@@ -44,7 +50,10 @@ export function useActions() {
     // repository list so a workflow never appears twice on the page.
     latestPerRepo: latestPerRepo.filter((r) => !activeIds.has(r.id)),
     isLoading: runsQ.isLoading || reposQ.isLoading,
-    error: (runsQ.error ?? reposQ.error) as Error | null,
+    // A failed runs poll keeps the last snapshot on screen and retries next
+    // tick; only repos failure blocks the page.
+    error: reposQ.error as Error | null,
+    runsError: runsQ.error as Error | null,
     dataUpdatedAt: runsQ.dataUpdatedAt,
   };
 }
