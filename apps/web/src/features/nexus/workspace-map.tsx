@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { usePathname } from "next/navigation";
 import {
   Activity,
   ArrowRight,
@@ -43,7 +42,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, ErrorState } from "@/components/common/error-state";
 import { FilterSelect, textOptions } from "@/components/common/filter-select";
-import { PageHead } from "@/components/layout/page-head";
 import { Input } from "@/components/ui/input";
 import { useGraph } from "@/features/graph/use-graph";
 import { useRepoCommitDetail, useRepoCommits, useRepoDirectory, useRepoFilePreview, useRepoReferences, useRepoSnapshot, useRepoWork } from "@/features/repositories/use-repo-snapshot";
@@ -54,9 +52,7 @@ import { ageInDays, cn, formatNumber, timeAgo } from "@/lib/utils";
 
 type RepoGroup = { login: string; repos: GithubRepo[] };
 
-export default function RepoMapPage() {
-  const pathname = usePathname();
-  const surface = pathname === "/nexus" || pathname === "/graph" ? "nexus" : "map";
+export function WorkspaceMap({ initialRepo = null, initialOrg = null, initialQuery = "" }: { initialRepo?: string | null; initialOrg?: string | null; initialQuery?: string } = {}) {
   const { repos, runs, isLoading, ciLoading, runsLoading, error, dataUpdatedAt } = useGraph(true);
   const [orgFilter, setOrgFilter] = useState("all");
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
@@ -67,10 +63,10 @@ export default function RepoMapPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const repo = params.get("repo");
-    const org = params.get("org");
+    const repo = params.get("repo") ?? initialRepo;
+    const org = params.get("org") ?? initialOrg;
     const status = params.get("status");
-    const query = params.get("q");
+    const query = params.get("q") ?? (initialQuery || null);
     // Intentional URL hydration after SSR.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (repo) setRequestedRepo(repo);
@@ -80,7 +76,7 @@ export default function RepoMapPage() {
     if (status === "attention" || status === "active") setStatusFilter(status);
     // Intentional URL hydration after SSR.
     if (query) setRepoQuery(query);
-  }, []);
+  }, [initialOrg, initialQuery, initialRepo]);
 
   const orgOptions = useMemo(() => textOptions(repos.map((repo) => repo.ownerLogin), "organizations"), [repos]);
   const effectiveOrgFilter = orgFilter !== "all" ? orgFilter : requestedOrg ?? "all";
@@ -125,7 +121,7 @@ export default function RepoMapPage() {
   useEffect(() => {
     if (!requestedRepo || !filteredRepos.length || filteredRepos.some((repo) => repo.fullName === requestedRepo)) return;
     // Keep a conflicting deep link from pointing at a different fallback dossier.
-    updateMapUrl(effectiveOrgFilter === "all" ? null : effectiveOrgFilter, null);
+    updateNexusUrl(effectiveOrgFilter === "all" ? null : effectiveOrgFilter, null);
   }, [effectiveOrgFilter, filteredRepos, requestedRepo]);
 
   function chooseOrg(value: string) {
@@ -133,19 +129,19 @@ export default function RepoMapPage() {
     setRequestedOrg(null);
     setRequestedRepo(null);
     setSelectedRepo(null);
-    updateMapUrl(value === "all" ? null : value, null);
+    updateNexusUrl(value === "all" ? null : value, null);
   }
 
   function chooseRepo(fullName: string) {
     setSelectedRepo(fullName);
     setRequestedRepo(fullName);
-    updateMapUrl(effectiveOrgFilter === "all" ? null : effectiveOrgFilter, fullName);
+    updateNexusUrl(effectiveOrgFilter === "all" ? null : effectiveOrgFilter, fullName);
   }
 
   function clearRepoFocus() {
     setSelectedRepo(null);
     setRequestedRepo(null);
-    updateMapUrl(effectiveOrgFilter === "all" ? null : effectiveOrgFilter, null);
+    updateNexusUrl(effectiveOrgFilter === "all" ? null : effectiveOrgFilter, null);
   }
 
   function changeRepoQuery(value: string) {
@@ -177,13 +173,12 @@ export default function RepoMapPage() {
 
   return (
     <div className="space-y-4">
-      <PageHead
-        title={surface === "nexus" ? "Gitty Nexus" : "System map"}
-        sub={`${filteredRepos.length} repositories · ${surface === "nexus" ? "a living architecture baseline grounded in repository evidence" : "understand ownership, code references, delivery flow, and repository health in one place"}`}
-        right={<div className="flex items-center gap-2"><CopyMapLink selected={selected} /><Badge variant={ciLoading ? "warning" : activeRuns.length ? "info" : "outline"}><Activity className="size-3" />{ciLoading ? "checking CI" : activeRuns.length ? `${activeRuns.length} workflows live` : dataUpdatedAt ? `synced ${timeAgo(new Date(dataUpdatedAt).toISOString())}` : "live map"}</Badge></div>}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/70 bg-background/25 px-3 py-2">
+        <p className="text-xs text-muted-foreground">{filteredRepos.length} repositories · ownership, code references, delivery flow, and dossier in one place</p>
+        <div className="flex items-center gap-2"><CopyNexusLink selected={selected} /><Badge variant={ciLoading ? "warning" : activeRuns.length ? "info" : "outline"}><Activity className="size-3" />{ciLoading ? "checking CI" : activeRuns.length ? `${activeRuns.length} workflows live` : dataUpdatedAt ? `synced ${timeAgo(new Date(dataUpdatedAt).toISOString())}` : "live workspace"}</Badge></div>
+      </div>
 
-      {surface === "nexus" ? <NexusBaselineSummary graph={baselineGraph} referencesLoading={referencesLoading} /> : null}
+      <NexusBaselineSummary graph={baselineGraph} referencesLoading={referencesLoading} />
 
       <Card accent={1} className="overflow-hidden">
         <CardContent className="flex flex-col gap-3 pt-3 sm:flex-row sm:items-center">
@@ -192,7 +187,7 @@ export default function RepoMapPage() {
               <MapIcon className="size-4" />
             </span>
             <span>
-            <span className="block text-xs font-semibold">{surface === "nexus" ? "Nexus architecture baseline" : "System map"}</span>
+            <span className="block text-xs font-semibold">Repository workspace</span>
             <span className="block text-[10px] text-muted-foreground">Click any node to inspect it · evidence before inference</span>
             </span>
           </div>
@@ -290,7 +285,7 @@ function SelectedFocusBar({ repo, onClear }: { repo: GithubRepo; onClear: () => 
   return <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/35 bg-[color-mix(in_srgb,var(--primary)_6%,var(--card))] px-3 py-2"><div className="flex min-w-0 items-center gap-2"><span className="size-2 shrink-0 rounded-full bg-[var(--primary)]" /><span className="shrink-0 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">inspecting</span><span className="truncate font-mono text-xs font-semibold">{repo.fullName}</span><span className="hidden text-[10px] text-muted-foreground sm:inline">{repo.primaryLanguage ?? "language undeclared"} · {repo.defaultBranch}</span></div><div className="flex shrink-0 items-center gap-3"><a href="#repo-dossier" className="inline-flex items-center gap-1 text-[10px] font-medium text-[var(--primary)] hover:underline">Jump to dossier <ArrowRight className="size-3" /></a><button type="button" onClick={onClear} className="text-[10px] text-muted-foreground hover:text-foreground hover:underline">Clear focus</button></div></div>;
 }
 
-function CopyMapLink({ selected }: { selected: GithubRepo | null }) {
+function CopyNexusLink({ selected }: { selected: GithubRepo | null }) {
   const [copied, setCopied] = useState(false);
 
   async function copyLink() {
@@ -305,7 +300,7 @@ function CopyMapLink({ selected }: { selected: GithubRepo | null }) {
     }
   }
 
-  return <Button type="button" variant="secondary" size="sm" onClick={() => void copyLink()} title="Copy a shareable System Map link"><Share2 className="size-3.5" />{copied ? "Link copied" : "Share view"}</Button>;
+  return <Button type="button" variant="secondary" size="sm" onClick={() => void copyLink()} title="Copy a shareable Nexus link"><Share2 className="size-3.5" />{copied ? "Link copied" : "Share view"}</Button>;
 }
 
 function SectionIndex({ hasSelection }: { hasSelection: boolean }) {
@@ -317,7 +312,7 @@ function SectionIndex({ hasSelection }: { hasSelection: boolean }) {
     ["delivery-flow", "Delivery"],
     ...(hasSelection ? [["repo-dossier", "Dossier"], ["recent-changes", "Changes"], ["codebase-shape", "Codebase"], ["current-work", "Work"]] : []),
   ];
-  return <nav aria-label="System map sections" className="flex items-center gap-1 overflow-x-auto rounded-md border border-border/70 bg-card/40 p-1"><span className="shrink-0 px-2 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Jump to</span>{sections.map(([id, label]) => <a key={id} href={`#${id}`} className="shrink-0 rounded px-2 py-1 text-[10px] text-muted-foreground transition hover:bg-accent hover:text-foreground">{label}</a>)}</nav>;
+  return <nav aria-label="Repository workspace sections" className="flex items-center gap-1 overflow-x-auto rounded-md border border-border/70 bg-card/40 p-1"><span className="shrink-0 px-2 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Jump to</span>{sections.map(([id, label]) => <a key={id} href={`#${id}`} className="shrink-0 rounded px-2 py-1 text-[10px] text-muted-foreground transition hover:bg-accent hover:text-foreground">{label}</a>)}</nav>;
 }
 
 type GraphEdge = { from: string; to: string; kind: "fork" | "code"; path?: string };
@@ -429,7 +424,7 @@ function CommitDetail({ detail, isLoading, error }: { detail: GithubRepoCommitDe
   return <div className="mx-8 mb-2 rounded-md border border-border/70 bg-background/30 p-2"><div className="mb-1.5 flex items-center justify-between gap-2"><span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">changed paths</span><span className="text-[10px] text-muted-foreground">{detail.files.length} file{detail.files.length === 1 ? "" : "s"}</span></div>{detail.files.length ? <div className="space-y-0.5">{detail.files.slice(0, 10).map((file) => <div key={file.path} className="flex items-center gap-2 text-[10px]"><span className="min-w-0 flex-1 truncate font-mono text-muted-foreground">{file.path}</span><span className="hidden text-[var(--primary)] sm:inline">{file.status}</span><span className="shrink-0 font-mono text-[var(--success)]">+{file.additions}</span><span className="shrink-0 font-mono text-[var(--destructive)]">-{file.deletions}</span></div>)}</div> : <p className="text-[10px] text-muted-foreground">No changed-file summary was returned for this commit.</p>}{detail.files.length > 10 ? <p className="mt-1.5 text-[10px] text-muted-foreground">+{detail.files.length - 10} more paths · open the full diff on GitHub</p> : null}</div>;
 }
 
-function updateMapUrl(org: string | null, repo: string | null) {
+function updateNexusUrl(org: string | null, repo: string | null) {
   const params = new URLSearchParams(window.location.search);
   if (org) params.set("org", org);
   else params.delete("org");
@@ -914,5 +909,5 @@ function latestRunByRepo(runs: GithubWorkflowRun[]) {
 }
 
 function MapLoading() {
-  return <div className="space-y-4"><PageHead title="System map" sub="Loading workspace signals…" /><div className="grid gap-2 sm:grid-cols-3"><div className="h-20 animate-pulse rounded-md border border-border bg-card" /><div className="h-20 animate-pulse rounded-md border border-border bg-card" /><div className="h-20 animate-pulse rounded-md border border-border bg-card" /></div><div className="h-[440px] animate-pulse rounded-md border border-border bg-card" /><div className="h-56 animate-pulse rounded-md border border-border bg-card" /></div>;
+  return <div className="space-y-4"><div className="grid gap-2 sm:grid-cols-3"><div className="h-20 animate-pulse rounded-md border border-border bg-card" /><div className="h-20 animate-pulse rounded-md border border-border bg-card" /><div className="h-20 animate-pulse rounded-md border border-border bg-card" /></div><div className="h-[440px] animate-pulse rounded-md border border-border bg-card" /><div className="h-56 animate-pulse rounded-md border border-border bg-card" /></div>;
 }

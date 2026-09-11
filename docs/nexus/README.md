@@ -12,9 +12,9 @@ without changing the UI's fundamental vocabulary.
 
 ## Product contract
 
-- `/nexus` is the canonical system-understanding entry point.
-- `/map` remains the repository-oriented compatibility view.
-- `/graph` remains a compatibility entry point for existing links.
+- `/nexus` is the only system-understanding entry point. The former `/map` and
+  `/graph` routes are removed; the repository workspace (ownership, references,
+  delivery signals, dossier) lives in the Nexus Repositories view.
 - Every non-trivial relationship needs evidence and a confidence level.
 - Missing evidence is shown as unknown; repository names are never treated as
   proof of a dependency.

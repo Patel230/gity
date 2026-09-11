@@ -80,7 +80,7 @@ export default function ActivityPage() {
       <PageHead
         title="Activity"
         sub={`${rows.length} events · unified feed across pushes, PRs, issues, reviews, releases`}
-        right={<Link href="/map" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-transparent px-3 text-xs font-medium transition-colors hover:border-primary/60 hover:bg-accent"><MapIcon className="size-3.5 text-[var(--primary)]" />Open system map</Link>}
+        right={<Link href="/nexus" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-transparent px-3 text-xs font-medium transition-colors hover:border-primary/60 hover:bg-accent"><MapIcon className="size-3.5 text-[var(--primary)]" />Open Nexus</Link>}
       />
       <div className="flex flex-wrap items-center gap-2">
         <Tabs value={range} onValueChange={(v) => setRange(v as "1" | "7" | "30")}>
@@ -122,7 +122,7 @@ export default function ActivityPage() {
                     </span>
                     <Badge variant={meta.tone}>{meta.label}</Badge>
                     </a>
-                    <Link href={`/map?repo=${encodeURIComponent(e.repoFullName)}`} className="hidden w-36 shrink-0 truncate text-right font-mono text-[11px] text-muted-foreground hover:text-[var(--primary)] hover:underline sm:inline" title="Open repository dossier">{e.repoFullName}</Link>
+                    <Link href={`/nexus?repo=${encodeURIComponent(e.repoFullName)}`} className="hidden w-36 shrink-0 truncate text-right font-mono text-[11px] text-muted-foreground hover:text-[var(--primary)] hover:underline sm:inline" title="Open repository dossier">{e.repoFullName}</Link>
                     <span className="w-14 shrink-0 text-right text-[11px] text-muted-foreground">{timeAgo(e.createdAt)}</span>
                   </div>
                 );

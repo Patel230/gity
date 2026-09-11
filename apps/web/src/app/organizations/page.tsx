@@ -37,9 +37,9 @@ export default function OrganizationsPage() {
         title="Organizations"
         sub={`${orgs.length} organization scope(s) accessible to you`}
         right={
-          <Link href="/map" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-transparent px-3 text-xs font-medium transition-colors hover:border-primary/60 hover:bg-accent">
+          <Link href="/nexus" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-transparent px-3 text-xs font-medium transition-colors hover:border-primary/60 hover:bg-accent">
             <MapIcon className="size-3.5 text-[var(--primary)]" />
-            Open system map
+            Open Nexus
           </Link>
         }
       />
@@ -89,7 +89,7 @@ export default function OrganizationsPage() {
                   <div className="overflow-hidden">
                     <div className="space-y-0.5 border-t border-border pt-2">
                       {(o.repos ?? []).slice(0, 20).map((r) => (
-                        <Link key={r.fullName} href={`/map?repo=${encodeURIComponent(r.fullName)}`} className="flex items-center justify-between rounded px-1.5 py-1 font-mono text-xs hover:bg-accent" title="Open repository dossier">
+                        <Link key={r.fullName} href={`/nexus?repo=${encodeURIComponent(r.fullName)}`} className="flex items-center justify-between rounded px-1.5 py-1 font-mono text-xs hover:bg-accent" title="Open repository dossier">
                           <span className="truncate">{r.name}</span>
                           <span className="shrink-0 text-[11px] text-muted-foreground">
                             {r.openPrCount} PR · {r.openIssueCount} issues · {timeAgo(r.pushedAt)}
@@ -101,8 +101,8 @@ export default function OrganizationsPage() {
                           +{(o.repos ?? []).length - 20} more — see Repos filtered by org
                         </p>
                       )}
-                      <Link href={`/map?org=${encodeURIComponent(o.login)}`} className="mt-1 inline-flex items-center gap-1.5 rounded px-1.5 py-1 text-[11px] text-[var(--primary)] hover:bg-accent hover:underline">
-                        <MapIcon className="size-3" /> Map this organization
+                      <Link href={`/nexus?org=${encodeURIComponent(o.login)}`} className="mt-1 inline-flex items-center gap-1.5 rounded px-1.5 py-1 text-[11px] text-[var(--primary)] hover:bg-accent hover:underline">
+                        <MapIcon className="size-3" /> Open in Nexus
                       </Link>
                     </div>
                   </div>

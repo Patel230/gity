@@ -140,7 +140,7 @@ export default function IssuesPage() {
                   </a>
                   {i.comments > 0 && <p className="text-[11px] text-muted-foreground">{i.comments} comments</p>}
                 </TD>
-                <TD className="whitespace-nowrap font-mono text-xs"><Link href={`/map?repo=${encodeURIComponent(i.repoFullName)}`} className="hover:text-[var(--primary)] hover:underline" title="Open repository dossier">{i.repoFullName}</Link></TD>
+                <TD className="whitespace-nowrap font-mono text-xs"><Link href={`/nexus?repo=${encodeURIComponent(i.repoFullName)}`} className="hover:text-[var(--primary)] hover:underline" title="Open repository dossier">{i.repoFullName}</Link></TD>
                 <TD>
                   <span className="inline-flex items-center gap-1.5 text-xs">
                     <Avatar src={i.authorAvatarUrl} alt={i.authorLogin} className="size-4" />

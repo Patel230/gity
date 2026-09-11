@@ -73,9 +73,9 @@ export default function RepositoriesPage() {
         title="Repositories"
         sub={`${rows.length} of ${repos.length} repos`}
         right={
-          <Link href="/map" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-transparent px-3 text-xs font-medium transition-colors hover:border-primary/60 hover:bg-accent">
+          <Link href="/nexus" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-transparent px-3 text-xs font-medium transition-colors hover:border-primary/60 hover:bg-accent">
             <MapIcon className="size-3.5 text-[var(--primary)]" />
-            Open system map
+            Open Nexus
           </Link>
         }
       />
@@ -125,7 +125,7 @@ export default function RepositoriesPage() {
             {rows.map((r) => (
               <TR key={r.fullName}>
                 <TD>
-                  <Link href={`/map?repo=${encodeURIComponent(r.fullName)}`} className="font-mono text-xs font-medium hover:text-[var(--primary)] hover:underline" title="Open repository dossier">
+                  <Link href={`/nexus?repo=${encodeURIComponent(r.fullName)}`} className="font-mono text-xs font-medium hover:text-[var(--primary)] hover:underline" title="Open repository dossier">
                     {r.name}
                   </Link>
                   {r.isArchived && <Badge variant="outline" className="ml-1.5">archived</Badge>}

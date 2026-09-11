@@ -132,7 +132,7 @@ export default function PullRequestsPage() {
                     </p>
                   )}
                 </TD>
-                <TD className="whitespace-nowrap font-mono text-xs"><Link href={`/map?repo=${encodeURIComponent(p.repoFullName)}`} className="hover:text-[var(--primary)] hover:underline" title="Open repository dossier">{p.repoFullName}</Link></TD>
+                <TD className="whitespace-nowrap font-mono text-xs"><Link href={`/nexus?repo=${encodeURIComponent(p.repoFullName)}`} className="hover:text-[var(--primary)] hover:underline" title="Open repository dossier">{p.repoFullName}</Link></TD>
                 <TD>
                   <span className="inline-flex items-center gap-1.5 text-xs">
                     <Avatar src={p.authorAvatarUrl} alt={p.authorLogin} className="size-4" />

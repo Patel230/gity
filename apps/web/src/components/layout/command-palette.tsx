@@ -108,7 +108,7 @@ export function CommandPalette({ data }: { data: PaletteData }) {
                     label: o,
                     onPick: () => {
                       setOpen(false);
-                      router.push(`/map?org=${encodeURIComponent(o)}`);
+                      router.push(`/nexus?org=${encodeURIComponent(o)}`);
                     },
                   }))}
                 />
@@ -123,7 +123,7 @@ export function CommandPalette({ data }: { data: PaletteData }) {
                     onPick: () => {
                       setOpen(false);
                       setQ("");
-                      router.push(`/map?repo=${encodeURIComponent(r.fullName)}`);
+                      router.push(`/nexus?repo=${encodeURIComponent(r.fullName)}`);
                     },
                   }))}
                 />

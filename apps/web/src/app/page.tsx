@@ -49,7 +49,7 @@ export default function OverviewPage() {
       <PageHead
         title="Overview"
         sub="Everything happening across your GitHub, right now."
-        right={<Link href="/map" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-transparent px-3 text-xs font-medium transition-colors hover:border-primary/60 hover:bg-accent"><MapIcon className="size-3.5 text-[var(--primary)]" />Open system map</Link>}
+        right={<Link href="/nexus" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-transparent px-3 text-xs font-medium transition-colors hover:border-primary/60 hover:bg-accent"><MapIcon className="size-3.5 text-[var(--primary)]" />Open Nexus</Link>}
       />
 
       <FocusQueue
@@ -129,7 +129,7 @@ export default function OverviewPage() {
               <EmptyState title="No failing repos" hint="Checked the most recently pushed repos." />
             ) : (
               s.failingRepos.slice(0, 6).map((r) => (
-                <Link key={r.fullName} href={`/map?repo=${encodeURIComponent(r.fullName)}`} className="flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-accent">
+                <Link key={r.fullName} href={`/nexus?repo=${encodeURIComponent(r.fullName)}`} className="flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-accent">
                   <CiDot state={r.ciState} />
                   <span className="truncate font-mono">{r.fullName}</span>
                 </Link>
@@ -153,7 +153,7 @@ export default function OverviewPage() {
             {s.mostActive.length === 0 && <EmptyState title="No recent activity" />}
             {s.mostActive.map((a) => {
               const content = <><Avatar src={a.repo?.ownerAvatarUrl} alt={a.fullName} className="size-5" /><span className="min-w-0 flex-1 truncate font-mono">{a.fullName}</span><Badge variant="default">{a.count}</Badge></>;
-              return a.repo ? <Link key={a.fullName} href={`/map?repo=${encodeURIComponent(a.fullName)}`} className="flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-accent">{content}</Link> : <a key={a.fullName} href={`https://github.com/${a.fullName}`} target="_blank" rel="noopener" className="flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-accent">{content}</a>;
+              return a.repo ? <Link key={a.fullName} href={`/nexus?repo=${encodeURIComponent(a.fullName)}`} className="flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-accent">{content}</Link> : <a key={a.fullName} href={`https://github.com/${a.fullName}`} target="_blank" rel="noopener" className="flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-accent">{content}</a>;
             })}
           </CardContent>
         </Card>
@@ -208,7 +208,7 @@ function FocusQueue({ failingRepos, openPrs, runs, runsReady }: { failingRepos: 
     items.push({
       label: "Fix failing CI",
       detail: repo.fullName,
-      href: `/map?repo=${encodeURIComponent(repo.fullName)}`,
+      href: `/nexus?repo=${encodeURIComponent(repo.fullName)}`,
       tone: "danger",
       icon: AlertTriangle,
     });

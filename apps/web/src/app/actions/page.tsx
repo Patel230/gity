@@ -81,7 +81,7 @@ function RunRow({ run }: { run: GithubWorkflowRun }) {
           {run.workflowName} <span className="font-mono text-muted-foreground">#{run.runNumber}</span>
         </a>
         <span className="block truncate font-mono text-[11px] text-muted-foreground">
-          <Link href={`/map?repo=${encodeURIComponent(run.repoFullName)}`} className="hover:text-[var(--primary)] hover:underline" title="Open repository dossier">{run.repoFullName}</Link> · {run.branch} · {run.event} · by {run.actorLogin}
+          <Link href={`/nexus?repo=${encodeURIComponent(run.repoFullName)}`} className="hover:text-[var(--primary)] hover:underline" title="Open repository dossier">{run.repoFullName}</Link> · {run.branch} · {run.event} · by {run.actorLogin}
         </span>
       </span>
       <a href={run.htmlUrl} target="_blank" rel="noopener" aria-label={`Open ${run.workflowName} run ${run.runNumber} on GitHub`}><StatusBadge run={run} /></a>

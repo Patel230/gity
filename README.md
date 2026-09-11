@@ -8,8 +8,7 @@ login, encrypted sessions, D1-backed response caching, resilient relay retries,
 and the optional protected read-only agent API. GitHub remains the source of truth;
 D1 stores only session metadata and short-lived per-user API response caches.
 
-The canonical orientation surface is **Gitty Nexus** at `/nexus` (with the repository-oriented
-compatibility view at `/map`). It groups repositories
+The canonical orientation surface is **Gitty Nexus** at `/nexus`. It groups repositories
 by ownership, shows verified fork lineage and exact bounded code references between repos,
 surfaces delivery and CI signals, and opens a selected repository into a dossier with its
 README, codebase shape, recent commits, changed paths, pull requests, and issues. Relationship
