@@ -1,6 +1,7 @@
 "use client";
 
 import { CheckCircle2, Clock, Loader, XCircle } from "lucide-react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -73,21 +74,21 @@ export default function ActionsPage() {
 
 function RunRow({ run }: { run: GithubWorkflowRun }) {
   return (
-    <a href={run.htmlUrl} target="_blank" rel="noopener" className="flex items-center gap-2 rounded px-1.5 py-1.5 text-xs hover:bg-accent">
+    <div className="flex items-center gap-2 rounded px-1.5 py-1.5 text-xs hover:bg-accent">
       <StatusIcon run={run} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-medium">
+        <a href={run.htmlUrl} target="_blank" rel="noopener" className="block truncate font-medium hover:text-[var(--primary)] hover:underline">
           {run.workflowName} <span className="font-mono text-muted-foreground">#{run.runNumber}</span>
-        </span>
+        </a>
         <span className="block truncate font-mono text-[11px] text-muted-foreground">
-          {run.repoFullName} · {run.branch} · {run.event} · by {run.actorLogin}
+          <Link href={`/map?repo=${encodeURIComponent(run.repoFullName)}`} className="hover:text-[var(--primary)] hover:underline" title="Open repository dossier">{run.repoFullName}</Link> · {run.branch} · {run.event} · by {run.actorLogin}
         </span>
       </span>
-      <StatusBadge run={run} />
+      <a href={run.htmlUrl} target="_blank" rel="noopener" aria-label={`Open ${run.workflowName} run ${run.runNumber} on GitHub`}><StatusBadge run={run} /></a>
       <span className="hidden w-16 shrink-0 text-right text-[11px] text-muted-foreground sm:inline">
         {timeAgo(run.updatedAt)}
       </span>
-    </a>
+    </div>
   );
 }
 

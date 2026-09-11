@@ -12,7 +12,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test src/lib/github/transport.test.mjs",
+    "test": "node --experimental-strip-types --test src/lib/github/transport.test.mjs src/lib/nexus/analyzers.test.mjs src/lib/nexus/normalize.test.mjs src/lib/nexus/filters.test.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply gity-prod --local",
     "db:migrate:remote": "wrangler d1 migrations apply gity-prod --remote"

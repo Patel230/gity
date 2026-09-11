@@ -61,6 +61,9 @@ export const REPOS_QUERY = /* GraphQL */ `
           isPrivate
           isArchived
           isFork
+          parent {
+            nameWithOwner
+          }
           primaryLanguage {
             name
             color

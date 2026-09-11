@@ -41,6 +41,8 @@ export interface GithubRepo {
   isPrivate: boolean;
   isArchived: boolean;
   isFork: boolean;
+  /** The upstream repository when GitHub identifies this repository as a fork. */
+  parentFullName: string | null;
   primaryLanguage: string | null;
   primaryLanguageColor: string | null;
   stars: number;
@@ -53,6 +55,83 @@ export interface GithubRepo {
   htmlUrl: string;
   /** Latest known CI state derived from the default-branch commit status / check runs. */
   ciState: CiState;
+}
+
+export interface GithubRepoSnapshot {
+  fullName: string;
+  rootEntries: { name: string; path: string; type: "file" | "dir" }[];
+  readme: { title: string | null; excerpt: string | null };
+  codeOwners: { path: string; owners: string[] } | null;
+}
+
+export interface GithubRepoFilePreview {
+  fullName: string;
+  path: string;
+  content: string;
+  truncated: boolean;
+}
+
+export interface GithubRepoCommit {
+  sha: string;
+  message: string;
+  authorLogin: string;
+  authorAvatarUrl: string;
+  authoredAt: string | null;
+  htmlUrl: string;
+}
+
+export interface GithubRepoCommitDetail {
+  sha: string;
+  message: string;
+  files: { path: string; status: string; additions: number; deletions: number; changes: number }[];
+}
+
+export interface GithubRepoReferenceSnapshot {
+  references: { sourceFullName: string; targetFullName: string; path: string; signal: "github-link" | "scoped-package" }[];
+  analyzedRepos: number;
+  totalRepos: number;
+  truncated: boolean;
+}
+
+export interface GithubRepoServiceCandidate {
+  repositoryFullName: string;
+  name: string;
+  path: string;
+  signal: "service-directory" | "runtime-manifest";
+  purpose?: string | null;
+  runtime?: string | null;
+}
+
+export interface GithubRepoServiceSnapshot {
+  services: GithubRepoServiceCandidate[];
+  signals: GithubRepoArchitectureSignal[];
+  connections: GithubRepoArchitectureConnection[];
+  analyzedRepos: number;
+  totalRepos: number;
+  truncated: boolean;
+}
+
+export interface GithubRepoArchitectureConnection {
+  repositoryFullName: string;
+  sourcePath: string;
+  sourceServicePath: string | null;
+  relation: "publishes" | "subscribes_to" | "calls";
+  targetName: string;
+  protocol: string | null;
+}
+
+export interface GithubRepoArchitectureSignal {
+  repositoryFullName: string;
+  name: string;
+  path: string;
+  type: "api" | "event" | "topic" | "queue" | "database" | "infrastructure";
+  signal: "contract-file" | "architecture-directory" | "runtime-config";
+}
+
+export interface GithubRepoWorkSnapshot {
+  fullName: string;
+  prs: GithubPullRequest[];
+  issues: GithubIssue[];
 }
 
 export type PrState = "open" | "draft" | "merged" | "closed";

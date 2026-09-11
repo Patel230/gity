@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import { Building2, ChevronDown, ChevronRight, GitPullRequest, CircleDot, Database } from "lucide-react";
+import { Building2, ChevronDown, ChevronRight, CircleDot, Database, GitPullRequest, Map as MapIcon } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,7 +33,16 @@ export default function OrganizationsPage() {
 
   return (
     <div className="space-y-4">
-      <PageHead title="Organizations" sub={`${orgs.length} organization scope(s) accessible to you`} />
+      <PageHead
+        title="Organizations"
+        sub={`${orgs.length} organization scope(s) accessible to you`}
+        right={
+          <Link href="/map" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-transparent px-3 text-xs font-medium transition-colors hover:border-primary/60 hover:bg-accent">
+            <MapIcon className="size-3.5 text-[var(--primary)]" />
+            Open system map
+          </Link>
+        }
+      />
       {orgs.length === 0 && (
         <EmptyState title="No organizations" hint="Your token can't see any orgs. Personal repos (if any) would appear here too." />
       )}
@@ -79,18 +89,21 @@ export default function OrganizationsPage() {
                   <div className="overflow-hidden">
                     <div className="space-y-0.5 border-t border-border pt-2">
                       {(o.repos ?? []).slice(0, 20).map((r) => (
-                        <a key={r.fullName} href={r.htmlUrl} target="_blank" rel="noopener" className="flex items-center justify-between rounded px-1.5 py-1 font-mono text-xs hover:bg-accent">
+                        <Link key={r.fullName} href={`/map?repo=${encodeURIComponent(r.fullName)}`} className="flex items-center justify-between rounded px-1.5 py-1 font-mono text-xs hover:bg-accent" title="Open repository dossier">
                           <span className="truncate">{r.name}</span>
                           <span className="shrink-0 text-[11px] text-muted-foreground">
                             {r.openPrCount} PR · {r.openIssueCount} issues · {timeAgo(r.pushedAt)}
                           </span>
-                        </a>
+                        </Link>
                       ))}
                       {(o.repos ?? []).length > 20 && (
                         <p className="px-1.5 py-1 text-[11px] text-muted-foreground">
                           +{(o.repos ?? []).length - 20} more — see Repos filtered by org
                         </p>
                       )}
+                      <Link href={`/map?org=${encodeURIComponent(o.login)}`} className="mt-1 inline-flex items-center gap-1.5 rounded px-1.5 py-1 text-[11px] text-[var(--primary)] hover:bg-accent hover:underline">
+                        <MapIcon className="size-3" /> Map this organization
+                      </Link>
                     </div>
                   </div>
                 </div>

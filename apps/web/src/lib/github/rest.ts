@@ -2,7 +2,7 @@
  * Typed GitHub REST helpers. Used where REST is better than GraphQL:
  * token check, search (PR/issue aggregation), Actions, events.
  */
-import { graphqlFetch, restFetch, restFetchAll } from "./client";
+import { graphqlFetch, restFetch } from "./client";
 import {
   CONTRIBUTIONS_QUERY,
   ORGS_QUERY,
@@ -26,10 +26,20 @@ import type {
   GithubOrg,
   GithubPullRequest,
   GithubRepo,
+  GithubRepoCommit,
+  GithubRepoCommitDetail,
+  GithubRepoFilePreview,
+  GithubRepoReferenceSnapshot,
+  GithubRepoArchitectureConnection,
+  GithubRepoArchitectureSignal,
+  GithubRepoServiceSnapshot,
+  GithubRepoSnapshot,
+  GithubRepoWorkSnapshot,
   GithubUser,
   GithubWorkflowRun,
   ReviewState,
 } from "./types";
+import { extractArchitectureConnections } from "../nexus/analyzers";
 
 /* ---------------------------------- types --------------------------------- */
 
@@ -56,6 +66,10 @@ interface RestSearchItem {
   updated_at: string;
   closed_at: string | null;
   html_url: string;
+}
+
+interface RestSearchPayload {
+  items: RestSearchItem[];
 }
 
 interface RestWorkflowRun {
@@ -159,6 +173,7 @@ interface RepoNode {
   isPrivate: boolean;
   isArchived: boolean;
   isFork: boolean;
+  parent: { nameWithOwner: string } | null;
   primaryLanguage: { name: string; color: string | null } | null;
   stargazerCount: number;
   forkCount: number;
@@ -169,6 +184,28 @@ interface RepoNode {
   owner: { login: string; avatarUrl: string };
   pullRequests: { totalCount: number };
   issues: { totalCount: number };
+}
+
+interface RestContentEntry {
+  name: string;
+  path: string;
+  type: string;
+  content?: string;
+  encoding?: string;
+}
+
+interface RestCommit {
+  sha: string;
+  html_url: string;
+  commit: {
+    message: string;
+    author: { name: string; date: string } | null;
+  };
+  author: { login: string; avatar_url: string } | null;
+}
+
+interface RestCommitDetail extends RestCommit {
+  files?: { filename: string; status: string; additions: number; deletions: number; changes: number }[];
 }
 
 interface ReposPayload {
@@ -187,6 +224,7 @@ function toRepo(n: RepoNode): GithubRepo {
     isPrivate: n.isPrivate,
     isArchived: n.isArchived,
     isFork: n.isFork,
+    parentFullName: n.parent?.nameWithOwner ?? null,
     primaryLanguage: n.primaryLanguage?.name ?? null,
     primaryLanguageColor: n.primaryLanguage?.color ?? null,
     stars: n.stargazerCount,
@@ -211,6 +249,361 @@ export async function fetchAllRepos(token: string | null): Promise<GithubRepo[]>
     { maxPages: 50 },
   );
   return nodes.map(toRepo);
+}
+
+/** Find reviewable service-shaped boundaries without assuming one repo is one service. */
+export async function fetchRepoServiceCandidates(
+  token: string | null,
+  repos: GithubRepo[],
+  maxRepos = 20,
+): Promise<GithubRepoServiceSnapshot> {
+  const selected = repos.slice(0, maxRepos);
+  const queue = [...selected];
+  const candidates: GithubRepoServiceSnapshot["services"] = [];
+  const signals: GithubRepoArchitectureSignal[] = [];
+  const connections: GithubRepoArchitectureConnection[] = [];
+  let analyzedRepos = 0;
+  const serviceDirectoryNames = new Set(["app", "apps", "cmd", "service", "services", "worker", "workers"]);
+  const runtimeManifests = new Set(["Cargo.toml", "Dockerfile", "go.mod", "package.json", "pyproject.toml", "serverless.yml", "wrangler.toml"]);
+
+  const scan = async (repo: GithubRepo) => {
+    const [owner, name] = repo.fullName.split("/");
+    if (!owner || !name) return;
+    try {
+      const root = await restFetch<RestContentEntry[]>(token, `/repos/${owner}/${name}/contents`, { query: { ref: repo.defaultBranch } });
+      analyzedRepos += 1;
+      signals.push(...root.data.map((entry) => architectureSignal(repo, entry)).filter((signal): signal is GithubRepoArchitectureSignal => Boolean(signal)));
+      const connectionFiles = new Map<string, RestContentEntry>();
+      root.data.filter((entry) => entry.type === "file" && isArchitectureContent(entry.name)).forEach((entry) => connectionFiles.set(entry.path, entry));
+      const roots = root.data.filter((entry) => entry.type === "dir" && serviceDirectoryNames.has(entry.name.toLowerCase()));
+      for (const serviceRoot of roots.slice(0, 4)) {
+        try {
+          const children = await restFetch<RestContentEntry[]>(token, `/repos/${owner}/${name}/contents/${serviceRoot.path.split("/").map((part) => encodeURIComponent(part)).join("/")}`, { query: { ref: repo.defaultBranch } });
+          children.data.filter((entry) => entry.type === "file" && isArchitectureContent(entry.name)).forEach((entry) => connectionFiles.set(entry.path, entry));
+          const childDirs = children.data.filter((entry) => entry.type === "dir").slice(0, 12);
+          if (childDirs.length) candidates.push(...childDirs.map((entry) => ({ repositoryFullName: repo.fullName, name: entry.name, path: entry.path, signal: "service-directory" as const, purpose: repo.description, runtime: repo.primaryLanguage })));
+          else candidates.push({ repositoryFullName: repo.fullName, name: serviceRoot.name, path: serviceRoot.path, signal: "service-directory", purpose: repo.description, runtime: repo.primaryLanguage });
+        } catch {
+          candidates.push({ repositoryFullName: repo.fullName, name: serviceRoot.name, path: serviceRoot.path, signal: "service-directory", purpose: repo.description, runtime: repo.primaryLanguage });
+        }
+      }
+      if (!roots.length) {
+        const manifest = root.data.find((entry) => entry.type === "file" && runtimeManifests.has(entry.name));
+        if (manifest) candidates.push({ repositoryFullName: repo.fullName, name: repo.name, path: manifest.path, signal: "runtime-manifest", purpose: repo.description, runtime: repo.primaryLanguage });
+      }
+      const servicePaths = candidates.filter((candidate) => candidate.repositoryFullName === repo.fullName).map((candidate) => candidate.path);
+      const files = [...connectionFiles.values()].slice(0, 8);
+      const content = await Promise.all(files.map(async (entry) => {
+        try {
+          const response = await restFetch<RestContentEntry>(token, `/repos/${owner}/${name}/contents/${entry.path.split("/").map((part) => encodeURIComponent(part)).join("/")}`, { query: { ref: repo.defaultBranch } });
+          return { entry, text: response.data.encoding === "base64" && response.data.content ? decodeBase64(response.data.content).slice(0, 80_000) : "" };
+        } catch {
+          return { entry, text: "" };
+        }
+      }));
+      for (const item of content) {
+        if (!item.text) continue;
+        const sourceServicePath = servicePaths.find((path) => item.entry.path === path || item.entry.path.startsWith(`${path}/`)) ?? null;
+        connections.push(...extractArchitectureConnections(item.text, item.entry.path, repo.fullName, sourceServicePath));
+      }
+    } catch {
+      // A partial permission failure should not hide candidates from other repos.
+    }
+  };
+
+  const workers = Array.from({ length: 4 }, async () => {
+    while (queue.length) await scan(queue.shift()!);
+  });
+  await Promise.all(workers);
+  return {
+    services: [...new Map(candidates.map((candidate) => [`${candidate.repositoryFullName}:${candidate.path}`, candidate])).values()],
+    signals: [...new Map(signals.map((signal) => [`${signal.repositoryFullName}:${signal.type}:${signal.path}`, signal])).values()],
+    connections: [...new Map(connections.map((connection) => [`${connection.repositoryFullName}:${connection.relation}:${connection.targetName}:${connection.sourcePath}`, connection])).values()],
+    analyzedRepos,
+    totalRepos: repos.length,
+    truncated: selected.length < repos.length,
+  };
+}
+
+function isArchitectureContent(name: string): boolean {
+  return /openapi|swagger|graphql|\.proto$|schema|event|topic|queue|kafka|redpanda|rabbitmq|amqp|sqs|compose|terraform|kubernetes|k8s|wrangler|\.tf$|\.ya?ml$/i.test(name);
+}
+
+function architectureSignal(repo: GithubRepo, entry: RestContentEntry): GithubRepoArchitectureSignal | null {
+  const value = entry.name.toLowerCase();
+  let type: GithubRepoArchitectureSignal["type"] | null = null;
+  let signal: GithubRepoArchitectureSignal["signal"] = "architecture-directory";
+  if (/openapi|swagger|graphql|\.proto$|schema\.graphql/.test(value)) {
+    type = "api";
+    signal = "contract-file";
+  } else if (/kafka|redpanda|topic|topics/.test(value)) type = "topic";
+  else if (/event|events/.test(value)) type = "event";
+  else if (/queue|queues|rabbitmq|sqs/.test(value)) type = "queue";
+  else if (/database|databases|postgres|mysql|mongo|redis|migration|migrations/.test(value)) type = "database";
+  else if (/infra|infrastructure|terraform|kubernetes|k8s|helm|docker-compose|kustomization|serverless|\.tf$|wrangler/.test(value)) {
+    type = "infrastructure";
+    signal = entry.type === "file" ? "runtime-config" : "architecture-directory";
+  }
+  if (!type) return null;
+  return { repositoryFullName: repo.fullName, name: entry.name, path: entry.path, type, signal };
+}
+
+/** Lightweight codebase orientation for one selected repository. */
+export async function fetchRepoSnapshot(
+  token: string | null,
+  fullName: string,
+  branch: string,
+): Promise<GithubRepoSnapshot> {
+  const [owner, name] = fullName.split("/");
+  if (!owner || !name) throw new Error("Invalid repository name.");
+
+  const rootPromise = restFetch<RestContentEntry[]>(token, `/repos/${owner}/${name}/contents`, {
+    query: { ref: branch },
+  });
+  const readmePromise = (async () => {
+    try {
+      return await restFetch<RestContentEntry>(token, `/repos/${owner}/${name}/readme`, {
+        query: { ref: branch },
+      });
+    } catch {
+      // A repository can have no README or a token can lack contents access.
+      return null;
+    }
+  })();
+  const root = await rootPromise;
+  const rootNames = new Set(root.data.map((entry) => entry.name));
+  const codeOwnersPath = rootNames.has("CODEOWNERS") ? "CODEOWNERS" : rootNames.has(".github") ? ".github/CODEOWNERS" : null;
+  const [readmeResponse, codeOwners] = await Promise.all([
+    readmePromise,
+    codeOwnersPath ? fetchRepoCodeOwners(token, owner, name, branch, codeOwnersPath) : Promise.resolve(null),
+  ]);
+  const rootEntries = root.data
+    .filter((entry) => entry.type === "file" || entry.type === "dir")
+    .map((entry) => ({
+      name: entry.name,
+      path: entry.path,
+      type: entry.type === "dir" ? ("dir" as const) : ("file" as const),
+    }))
+    .sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === "dir" ? -1 : 1));
+
+  let readme: GithubRepoSnapshot["readme"] = { title: null, excerpt: null };
+  if (readmeResponse?.data.content && readmeResponse.data.encoding === "base64") {
+    const decoded = decodeBase64(readmeResponse.data.content);
+    const lines = decoded.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const title = lines.find((line) => /^#\s+/.test(line))?.replace(/^#\s+/, "").trim() ?? null;
+    const excerpt = lines
+      .filter((line) => !/^#{1,6}\s+/.test(line) && !/^[-*_`>]/.test(line))
+      .join(" ")
+      .replace(/[`*_\[\]]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 260) || null;
+    readme = { title, excerpt };
+  }
+
+  return { fullName, rootEntries, readme, codeOwners };
+}
+
+async function fetchRepoCodeOwners(
+  token: string | null,
+  owner: string,
+  name: string,
+  branch: string,
+  path: string,
+): Promise<{ path: string; owners: string[] } | null> {
+  try {
+    const encodedPath = path.split("/").map((part) => encodeURIComponent(part)).join("/");
+    const response = await restFetch<RestContentEntry>(token, `/repos/${owner}/${name}/contents/${encodedPath}`, {
+      query: { ref: branch },
+    });
+    if (!response.data.content || response.data.encoding !== "base64") return null;
+    const content = decodeBase64(response.data.content);
+    const owners = new Set<string>();
+    for (const line of content.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      for (const candidate of trimmed.split(/\s+/).slice(1)) {
+        if (candidate.startsWith("@") || candidate.includes("@")) owners.add(candidate);
+      }
+      if (owners.size >= 12) break;
+    }
+    return { path, owners: [...owners].slice(0, 12) };
+  } catch {
+    return null;
+  }
+}
+
+/** Fetch one directory only when a user expands it in Repo Map. */
+export async function fetchRepoDirectory(
+  token: string | null,
+  fullName: string,
+  branch: string,
+  path: string,
+): Promise<GithubRepoSnapshot["rootEntries"]> {
+  const [owner, name] = fullName.split("/");
+  if (!owner || !name) throw new Error("Invalid repository name.");
+  const encodedPath = path.split("/").map((part) => encodeURIComponent(part)).join("/");
+  const response = await restFetch<RestContentEntry[]>(token, `/repos/${owner}/${name}/contents/${encodedPath}`, {
+    query: { ref: branch },
+  });
+  return response.data
+    .filter((entry) => entry.type === "file" || entry.type === "dir")
+    .map((entry) => ({
+      name: entry.name,
+      path: entry.path,
+      type: entry.type === "dir" ? ("dir" as const) : ("file" as const),
+    }))
+    .sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === "dir" ? -1 : 1));
+}
+
+/** Fetch a bounded text preview for one file selected in Repo Map. */
+export async function fetchRepoFilePreview(
+  token: string | null,
+  fullName: string,
+  branch: string,
+  path: string,
+): Promise<GithubRepoFilePreview> {
+  const [owner, name] = fullName.split("/");
+  if (!owner || !name) throw new Error("Invalid repository name.");
+  const encodedPath = path.split("/").map((part) => encodeURIComponent(part)).join("/");
+  const response = await restFetch<RestContentEntry>(token, `/repos/${owner}/${name}/contents/${encodedPath}`, {
+    query: { ref: branch },
+  });
+  if (!response.data.content || response.data.encoding !== "base64") throw new Error("This file cannot be previewed as text.");
+  const decoded = decodeBase64(response.data.content);
+  const maxCharacters = 12_000;
+  const maxLines = 180;
+  const clipped = decoded.slice(0, maxCharacters);
+  const lines = clipped.split(/\r?\n/);
+  const truncated = decoded.length > maxCharacters || lines.length > maxLines;
+  return {
+    fullName,
+    path,
+    content: lines.slice(0, maxLines).join("\n"),
+    truncated,
+  };
+}
+
+/** Recent default-branch commits for repository orientation. */
+export async function fetchRepoCommits(
+  token: string | null,
+  fullName: string,
+  branch: string,
+  perPage = 8,
+): Promise<GithubRepoCommit[]> {
+  const response = await restFetch<RestCommit[]>(token, `/repos/${fullName}/commits`, {
+    query: { sha: branch, per_page: perPage },
+  });
+  return response.data.map((commit) => ({
+    sha: commit.sha,
+    message: commit.commit.message.split(/\r?\n/, 1)[0] ?? "Untitled commit",
+    authorLogin: commit.author?.login ?? commit.commit.author?.name ?? "unknown",
+    authorAvatarUrl: commit.author?.avatar_url ?? "",
+    authoredAt: commit.commit.author?.date ?? null,
+    htmlUrl: commit.html_url,
+  }));
+}
+
+/** On-demand file summary for one commit, kept separate from the commit list. */
+export async function fetchRepoCommitDetail(
+  token: string | null,
+  fullName: string,
+  sha: string,
+): Promise<GithubRepoCommitDetail> {
+  const response = await restFetch<RestCommitDetail>(token, `/repos/${fullName}/commits/${encodeURIComponent(sha)}`);
+  return {
+    sha: response.data.sha,
+    message: response.data.commit.message.split(/\r?\n/, 1)[0] ?? "Untitled commit",
+    files: (response.data.files ?? []).map((file) => ({
+      path: file.filename,
+      status: file.status,
+      additions: file.additions,
+      deletions: file.deletions,
+      changes: file.changes,
+    })),
+  };
+}
+
+const REFERENCE_FILES = ["package.json", "go.mod", "Cargo.toml", "pyproject.toml", "README.md"];
+
+/**
+ * Find exact, repository-shaped references in a bounded source scan.
+ * References are resolved against every repository in the selected scope, so
+ * a quiet target repository is not lost just because it was not selected as a
+ * source to inspect. This intentionally does not infer edges from names alone.
+ */
+export async function fetchRepoReferences(
+  token: string | null,
+  repos: GithubRepo[],
+  limit = 16,
+  priorityFullName?: string,
+): Promise<GithubRepoReferenceSnapshot> {
+  const ordered = repos
+    .slice()
+    .sort((a, b) => (b.pushedAt ?? "").localeCompare(a.pushedAt ?? ""))
+  const priority = priorityFullName ? ordered.find((repo) => repo.fullName === priorityFullName) : undefined;
+  const sources = [
+    ...(priority ? [priority] : []),
+    ...ordered.filter((repo) => repo.fullName !== priorityFullName),
+  ].slice(0, limit);
+  const references: GithubRepoReferenceSnapshot["references"] = [];
+  const queue = [...sources];
+  const workers = Array.from({ length: 4 }, async () => {
+    while (queue.length) {
+      const source = queue.shift();
+      if (!source) return;
+      const text = await fetchReferenceFile(token, source);
+      if (!text) continue;
+      for (const target of repos) {
+        if (target.fullName === source.fullName) continue;
+        const signal = referenceSignal(text.content, source, target);
+        if (signal) references.push({ sourceFullName: source.fullName, targetFullName: target.fullName, path: text.path, signal });
+      }
+    }
+  });
+  await Promise.all(workers);
+  const deduped = [...new Map(references.map((reference) => [`${reference.sourceFullName}:${reference.targetFullName}`, reference])).values()]
+    .sort((a, b) => `${a.sourceFullName}:${a.targetFullName}`.localeCompare(`${b.sourceFullName}:${b.targetFullName}`));
+  return { references: deduped, analyzedRepos: sources.length, totalRepos: repos.length, truncated: repos.length > sources.length };
+}
+
+async function fetchReferenceFile(token: string | null, repo: GithubRepo): Promise<{ path: string; content: string } | null> {
+  const [owner, name] = repo.fullName.split("/");
+  if (!owner || !name) return null;
+  try {
+    const root = await restFetch<RestContentEntry[]>(token, `/repos/${owner}/${name}/contents`, { query: { ref: repo.defaultBranch } });
+    const rootNames = new Set(root.data.filter((entry) => entry.type === "file").map((entry) => entry.name));
+    const path = REFERENCE_FILES.find((candidate) => rootNames.has(candidate));
+    if (!path) return null;
+    const response = await restFetch<RestContentEntry>(token, `/repos/${owner}/${name}/contents/${encodeURIComponent(path)}`, { query: { ref: repo.defaultBranch } });
+    if (!response.data.content || response.data.encoding !== "base64") return null;
+    const content = decodeBase64(response.data.content);
+    return content ? { path, content: content.slice(0, 40_000) } : null;
+  } catch {
+    return null;
+  }
+}
+
+function referenceSignal(text: string, source: GithubRepo, target: GithubRepo): "github-link" | "scoped-package" | null {
+  const [owner, name] = target.fullName.split("/");
+  if (!owner || !name) return null;
+  const escaped = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const fullName = escaped(`${owner}/${name}`);
+  if (new RegExp(`github\\.com[/:]${fullName}(?:\\.git)?(?:[^A-Za-z0-9_-]|$)`, "i").test(text)) return "github-link";
+  if (source.primaryLanguage === "JavaScript" || source.primaryLanguage === "TypeScript") {
+    if (new RegExp(`['\"]@${escaped(owner)}/${escaped(name)}(?:['\"@/:]|$)`, "i").test(text)) return "scoped-package";
+  }
+  return null;
+}
+
+function decodeBase64(value: string): string {
+  try {
+    const binary = atob(value.replace(/\s/g, ""));
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return "";
+  }
 }
 
 /** Default-branch combined CI state for one repo (graceful when checks are inaccessible). */
@@ -403,10 +796,7 @@ export async function searchPrsRest(
   query: string,
   opts?: { maxPages?: number },
 ): Promise<GithubPullRequest[]> {
-  const items = await restFetchAll<RestSearchItem>(token, "/search/issues", {
-    query: { q: `${query} type:pr`, per_page: 100 },
-    maxPages: opts?.maxPages ?? 10,
-  });
+  const items = await searchRestItems(token, `${query} type:pr`, opts?.maxPages ?? 10);
   return items
     .filter((i) => i.pull_request)
     .map((i) => {
@@ -448,10 +838,7 @@ export async function searchIssuesRest(
   query: string,
   opts?: { maxPages?: number },
 ): Promise<GithubIssue[]> {
-  const items = await restFetchAll<RestSearchItem>(token, "/search/issues", {
-    query: { q: `${query} type:issue`, per_page: 100 },
-    maxPages: opts?.maxPages ?? 10,
-  });
+  const items = await searchRestItems(token, `${query} type:issue`, opts?.maxPages ?? 10);
   return items
     .filter((i) => !i.pull_request)
     .map((i) => ({
@@ -471,6 +858,19 @@ export async function searchIssuesRest(
       closedAt: i.closed_at,
       htmlUrl: i.html_url,
     }));
+}
+
+/** GitHub search wraps results in an `items` field, unlike list endpoints. */
+async function searchRestItems(token: string | null, query: string, maxPages: number): Promise<RestSearchItem[]> {
+  const items: RestSearchItem[] = [];
+  for (let page = 1; page <= maxPages; page += 1) {
+    const response = await restFetch<RestSearchPayload>(token, "/search/issues", {
+      query: { q: query, per_page: 100, page },
+    });
+    items.push(...response.data.items);
+    if (response.data.items.length < 100) break;
+  }
+  return items;
 }
 
 function repoFullNameFromUrl(repositoryUrl: string): string {
@@ -561,6 +961,55 @@ export async function fetchRepoOpenPrs(
   } catch {
     return [];
   }
+}
+
+/** Open issues for one repository (search keeps pull requests out of the result). */
+export async function fetchRepoOpenIssues(
+  token: string | null,
+  fullName: string,
+  perPage = 10,
+): Promise<GithubIssue[]> {
+  try {
+    const { data } = await restFetch<RestSearchPayload>(token, "/search/issues", {
+      query: { q: `repo:${fullName} is:issue is:open`, per_page: perPage, sort: "updated", direction: "desc" },
+    });
+    const orgLogin = fullName.split("/")[0] ?? "";
+    return data.items
+      .filter((issue) => !issue.pull_request)
+      .map((issue) => ({
+        id: `repo-issue-${issue.id}`,
+        number: issue.number,
+        title: issue.title,
+        repoFullName: fullName,
+        orgLogin,
+        authorLogin: issue.user?.login ?? "ghost",
+        authorAvatarUrl: issue.user?.avatar_url ?? "",
+        state: "open" as const,
+        assignees: issue.assignees.map((assignee) => assignee.login),
+        labels: issue.labels.map((label) => ({ name: label.name, color: label.color })),
+        comments: issue.comments,
+        createdAt: issue.created_at,
+        updatedAt: issue.updated_at,
+        closedAt: issue.closed_at,
+        htmlUrl: issue.html_url,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+/** Bounded current-work snapshot for the selected repository. */
+export async function fetchRepoWorkSnapshot(
+  token: string | null,
+  fullName: string,
+): Promise<GithubRepoWorkSnapshot> {
+  const [owner, name] = fullName.split("/");
+  if (!owner || !name) throw new Error("Invalid repository name.");
+  const [prs, issues] = await Promise.all([
+    fetchRepoOpenPrs(token, owner, name),
+    fetchRepoOpenIssues(token, fullName),
+  ]);
+  return { fullName, prs, issues };
 }
 
 /* --------------------------------- actions --------------------------------- */

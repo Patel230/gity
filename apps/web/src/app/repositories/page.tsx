@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowDownUp, Star } from "lucide-react";
+import { ArrowDownUp, Map as MapIcon, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -68,7 +69,16 @@ export default function RepositoriesPage() {
 
   return (
     <div className="space-y-3">
-      <PageHead title="Repositories" sub={`${rows.length} of ${repos.length} repos`} />
+      <PageHead
+        title="Repositories"
+        sub={`${rows.length} of ${repos.length} repos`}
+        right={
+          <Link href="/map" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-transparent px-3 text-xs font-medium transition-colors hover:border-primary/60 hover:bg-accent">
+            <MapIcon className="size-3.5 text-[var(--primary)]" />
+            Open system map
+          </Link>
+        }
+      />
       <div className="flex flex-wrap items-center gap-2">
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search repos…" className="w-48" />
         <FilterSelect value={org} onChange={setOrg} label="Organizations" options={orgOptions} />
@@ -115,9 +125,9 @@ export default function RepositoriesPage() {
             {rows.map((r) => (
               <TR key={r.fullName}>
                 <TD>
-                  <a href={r.htmlUrl} target="_blank" rel="noopener" className="font-mono text-xs font-medium hover:text-[var(--primary)] hover:underline">
+                  <Link href={`/map?repo=${encodeURIComponent(r.fullName)}`} className="font-mono text-xs font-medium hover:text-[var(--primary)] hover:underline" title="Open repository dossier">
                     {r.name}
-                  </a>
+                  </Link>
                   {r.isArchived && <Badge variant="outline" className="ml-1.5">archived</Badge>}
                   {r.isFork && <Badge variant="outline" className="ml-1.5">fork</Badge>}
                   {r.description && <p className="max-w-56 truncate text-[11px] text-muted-foreground">{r.description}</p>}

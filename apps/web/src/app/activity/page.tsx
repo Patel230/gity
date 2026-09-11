@@ -9,7 +9,9 @@ import {
   CircleDot,
   Eye,
   XCircle,
+  Map as MapIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -75,7 +77,11 @@ export default function ActivityPage() {
 
   return (
     <div className="space-y-3">
-      <PageHead title="Activity" sub={`${rows.length} events · unified feed across pushes, PRs, issues, reviews, releases`} />
+      <PageHead
+        title="Activity"
+        sub={`${rows.length} events · unified feed across pushes, PRs, issues, reviews, releases`}
+        right={<Link href="/map" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-transparent px-3 text-xs font-medium transition-colors hover:border-primary/60 hover:bg-accent"><MapIcon className="size-3.5 text-[var(--primary)]" />Open system map</Link>}
+      />
       <div className="flex flex-wrap items-center gap-2">
         <Tabs value={range} onValueChange={(v) => setRange(v as "1" | "7" | "30")}>
           <TabsList>
@@ -106,7 +112,8 @@ export default function ActivityPage() {
                 const meta = KIND_META[e.kind];
                 const Icon = meta.icon;
                 return (
-                  <a key={e.id} href={e.htmlUrl} target="_blank" rel="noopener" className="flex items-center gap-2.5 rounded px-1.5 py-1.5 text-xs hover:bg-accent">
+                  <div key={e.id} className="flex items-center gap-2.5 rounded px-1.5 py-1.5 text-xs hover:bg-accent">
+                    <a href={e.htmlUrl} target="_blank" rel="noopener" className="flex min-w-0 flex-1 items-center gap-2.5">
                     <Avatar src={e.actorAvatarUrl} alt={e.actorLogin} className="size-5" />
                     <Icon className="size-3.5 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate">
@@ -114,9 +121,10 @@ export default function ActivityPage() {
                       <span className="text-muted-foreground">{e.title}</span>
                     </span>
                     <Badge variant={meta.tone}>{meta.label}</Badge>
-                    <span className="hidden w-36 shrink-0 truncate text-right font-mono text-[11px] text-muted-foreground sm:inline">{e.repoFullName}</span>
+                    </a>
+                    <Link href={`/map?repo=${encodeURIComponent(e.repoFullName)}`} className="hidden w-36 shrink-0 truncate text-right font-mono text-[11px] text-muted-foreground hover:text-[var(--primary)] hover:underline sm:inline" title="Open repository dossier">{e.repoFullName}</Link>
                     <span className="w-14 shrink-0 text-right text-[11px] text-muted-foreground">{timeAgo(e.createdAt)}</span>
-                  </a>
+                  </div>
                 );
               })}
             </CardContent>

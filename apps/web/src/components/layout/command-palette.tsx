@@ -108,7 +108,7 @@ export function CommandPalette({ data }: { data: PaletteData }) {
                     label: o,
                     onPick: () => {
                       setOpen(false);
-                      router.push("/organizations");
+                      router.push(`/map?org=${encodeURIComponent(o)}`);
                     },
                   }))}
                 />
@@ -120,7 +120,11 @@ export function CommandPalette({ data }: { data: PaletteData }) {
                     key: r.fullName,
                     label: r.fullName,
                     sub: r.description ?? undefined,
-                    onPick: () => go(r.htmlUrl),
+                    onPick: () => {
+                      setOpen(false);
+                      setQ("");
+                      router.push(`/map?repo=${encodeURIComponent(r.fullName)}`);
+                    },
                   }))}
                 />
                 <PaletteGroup

@@ -12,6 +12,14 @@ import {
   fetchContributionDays,
   fetchOrgs,
   fetchRepoCiState,
+  fetchRepoCommits,
+  fetchRepoCommitDetail,
+  fetchRepoReferences,
+  fetchRepoServiceCandidates,
+  fetchRepoDirectory,
+  fetchRepoFilePreview,
+  fetchRepoSnapshot,
+  fetchRepoWorkSnapshot,
   fetchPullRequestCiState,
   fetchRepoWorkflowRuns,
   fetchSearchPrsAndIssues,
@@ -28,6 +36,13 @@ import type {
   GithubOrg,
   GithubPullRequest,
   GithubRepo,
+  GithubRepoCommit,
+  GithubRepoCommitDetail,
+  GithubRepoReferenceSnapshot,
+  GithubRepoServiceSnapshot,
+  GithubRepoFilePreview,
+  GithubRepoSnapshot,
+  GithubRepoWorkSnapshot,
   GithubUser,
   GithubWorkflowRun,
 } from "./types";
@@ -55,6 +70,8 @@ export const qk = {
   viewer: (fp: string) => ["gity", fp, "viewer"] as const,
   orgs: (fp: string) => ["gity", fp, "orgs"] as const,
   repos: (fp: string) => ["gity", fp, "repos"] as const,
+  repoSnapshot: (fp: string, fullName = "") => ["gity", fp, "repo-snapshot", fullName] as const,
+  repoServices: (fp: string, ids: string) => ["gity", fp, "nexus", "services", ids] as const,
   ciStates: (fp: string) => ["gity", fp, "ci-states"] as const,
   prCiStates: (fp: string) => ["gity", fp, "pr-ci-states"] as const,
   // PR/issue/event keys include the login so the first fetch
@@ -157,6 +174,144 @@ export function reposOptions(token: string | null, fp: string) {
     enabled: fp !== "anon",
     staleTime: 60_000,
     gcTime: 15 * 60_000,
+    retry: (count, err) => retryPolicy(count, err),
+  });
+}
+
+export function repoSnapshotOptions(
+  token: string | null,
+  fp: string,
+  repo: GithubRepo | null,
+) {
+  return queryOptions<GithubRepoSnapshot, GithubApiError>({
+    ...CALM,
+    queryKey: qk.repoSnapshot(fp, repo?.fullName ?? ""),
+    queryFn: () => fetchRepoSnapshot(token, repo!.fullName, repo!.defaultBranch),
+    enabled: fp !== "anon" && !!repo,
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: (count, err) => retryPolicy(count, err),
+  });
+}
+
+export function repoDirectoryOptions(
+  token: string | null,
+  fp: string,
+  repo: GithubRepo | null,
+  path: string | null,
+) {
+  return queryOptions<GithubRepoSnapshot["rootEntries"], GithubApiError>({
+    ...CALM,
+    queryKey: [...qk.repoSnapshot(fp, repo?.fullName ?? ""), "directory", path ?? ""],
+    queryFn: () => fetchRepoDirectory(token, repo!.fullName, repo!.defaultBranch, path!),
+    enabled: fp !== "anon" && !!repo && !!path,
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: (count, err) => retryPolicy(count, err),
+  });
+}
+
+export function repoFileOptions(
+  token: string | null,
+  fp: string,
+  repo: GithubRepo | null,
+  path: string | null,
+) {
+  return queryOptions<GithubRepoFilePreview, GithubApiError>({
+    ...CALM,
+    queryKey: [...qk.repoSnapshot(fp, repo?.fullName ?? ""), "file", path ?? ""],
+    queryFn: () => fetchRepoFilePreview(token, repo!.fullName, repo!.defaultBranch, path!),
+    enabled: fp !== "anon" && !!repo && !!path,
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: (count, err) => retryPolicy(count, err),
+  });
+}
+
+export function repoCommitsOptions(
+  token: string | null,
+  fp: string,
+  repo: GithubRepo | null,
+) {
+  return queryOptions<GithubRepoCommit[], GithubApiError>({
+    ...CALM,
+    queryKey: [...qk.repoSnapshot(fp, repo?.fullName ?? ""), "commits"],
+    queryFn: () => fetchRepoCommits(token, repo!.fullName, repo!.defaultBranch),
+    enabled: fp !== "anon" && !!repo,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: (count, err) => retryPolicy(count, err),
+  });
+}
+
+export function repoCommitDetailOptions(
+  token: string | null,
+  fp: string,
+  repo: GithubRepo | null,
+  sha: string | null,
+) {
+  return queryOptions<GithubRepoCommitDetail, GithubApiError>({
+    ...CALM,
+    queryKey: [...qk.repoSnapshot(fp, repo?.fullName ?? ""), "commit", sha ?? ""],
+    queryFn: () => fetchRepoCommitDetail(token, repo!.fullName, sha!),
+    enabled: fp !== "anon" && !!repo && !!sha,
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: (count, err) => retryPolicy(count, err),
+  });
+}
+
+export function repoReferencesOptions(
+  token: string | null,
+  fp: string,
+  repos: GithubRepo[],
+  priorityRepo?: GithubRepo | null,
+) {
+  const ids = repos.map((repo) => `${repo.fullName}:${repo.defaultBranch}`).join(",");
+  // Keep the shared workspace snapshot reusable when the selected repository
+  // is already one of the default sources. Only a quieter repository outside
+  // that set needs a distinct prioritized scan.
+  const defaultSources = repos
+    .slice()
+    .sort((a, b) => (b.pushedAt ?? "").localeCompare(a.pushedAt ?? ""))
+    .slice(0, 16);
+  const priority = priorityRepo && !defaultSources.some((repo) => repo.fullName === priorityRepo.fullName) ? priorityRepo.fullName : "";
+  return queryOptions<GithubRepoReferenceSnapshot, GithubApiError>({
+    ...CALM,
+    queryKey: [...qk.repoSnapshot(fp, "workspace"), "references", ids, priority],
+    queryFn: () => fetchRepoReferences(token, repos, 16, priority || undefined),
+    enabled: fp !== "anon" && repos.length > 0,
+    staleTime: 15 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: (count, err) => retryPolicy(count, err),
+  });
+}
+
+export function repoServiceCandidatesOptions(token: string | null, fp: string, repos: GithubRepo[]) {
+  const ids = repos.map((repo) => `${repo.fullName}:${repo.defaultBranch}`).join(",");
+  return queryOptions<GithubRepoServiceSnapshot, GithubApiError>({
+    ...CALM,
+    queryKey: qk.repoServices(fp, ids),
+    queryFn: () => fetchRepoServiceCandidates(token, repos, 20),
+    enabled: fp !== "anon" && repos.length > 0,
+    staleTime: 15 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: (count, err) => retryPolicy(count, err),
+  });
+}
+
+export function repoWorkOptions(
+  token: string | null,
+  fp: string,
+  repo: GithubRepo | null,
+) {
+  return queryOptions<GithubRepoWorkSnapshot, GithubApiError>({
+    ...CALM,
+    queryKey: [...qk.repoSnapshot(fp, repo?.fullName ?? ""), "work"],
+    queryFn: () => fetchRepoWorkSnapshot(token, repo!.fullName),
+    enabled: fp !== "anon" && !!repo,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
     retry: (count, err) => retryPolicy(count, err),
   });
 }

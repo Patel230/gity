@@ -3,13 +3,17 @@
 import Link from "next/link";
 import {
   AlertTriangle,
+  ArrowRight,
+  ArrowUpRight,
   Building2,
+  CheckCircle2,
   CircleDot,
   Database,
   Flame,
   GitCommitHorizontal,
   GitMerge,
   GitPullRequest,
+  Map as MapIcon,
   Play,
   Zap,
 } from "lucide-react";
@@ -25,7 +29,8 @@ import { StatCard, StatCardLoading } from "@/components/common/stat-card";
 import { useOverview } from "@/features/overview/use-overview";
 import { IssueActivityChart, PrActivityChart } from "@/features/overview/charts";
 import { useStreak } from "@/features/streak/use-streak";
-import { timeAgo } from "@/lib/utils";
+import { ageInDays, cn, timeAgo } from "@/lib/utils";
+import type { GithubPullRequest, GithubRepo, GithubWorkflowRun } from "@/lib/github/types";
 import { PageHead } from "@/components/layout/page-head";
 
 export default function OverviewPage() {
@@ -41,7 +46,18 @@ export default function OverviewPage() {
   const num = (v: number, ok: boolean): string | number => (ok ? v : "…");
   return (
     <div className="space-y-4">
-      <PageHead title="Overview" sub="Everything happening across your GitHub, right now." />
+      <PageHead
+        title="Overview"
+        sub="Everything happening across your GitHub, right now."
+        right={<Link href="/map" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-transparent px-3 text-xs font-medium transition-colors hover:border-primary/60 hover:bg-accent"><MapIcon className="size-3.5 text-[var(--primary)]" />Open system map</Link>}
+      />
+
+      <FocusQueue
+        failingRepos={s.failingRepos}
+        openPrs={ov.openPrs}
+        runs={ov.runs}
+        runsReady={ov.ready.runs}
+      />
 
       {/* Headline stats */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
@@ -113,10 +129,10 @@ export default function OverviewPage() {
               <EmptyState title="No failing repos" hint="Checked the most recently pushed repos." />
             ) : (
               s.failingRepos.slice(0, 6).map((r) => (
-                <a key={r.fullName} href={r.htmlUrl} target="_blank" rel="noopener" className="flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-accent">
+                <Link key={r.fullName} href={`/map?repo=${encodeURIComponent(r.fullName)}`} className="flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-accent">
                   <CiDot state={r.ciState} />
                   <span className="truncate font-mono">{r.fullName}</span>
-                </a>
+                </Link>
               ))
             )}
             <Link href="/actions" className="block pt-1 text-xs text-[var(--primary)] hover:underline">
@@ -135,13 +151,10 @@ export default function OverviewPage() {
           </CardHeader>
           <CardContent className="space-y-1">
             {s.mostActive.length === 0 && <EmptyState title="No recent activity" />}
-            {s.mostActive.map((a) => (
-              <a key={a.fullName} href={a.repo?.htmlUrl ?? `https://github.com/${a.fullName}`} target="_blank" rel="noopener" className="flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-accent">
-                <Avatar src={a.repo?.ownerAvatarUrl} alt={a.fullName} className="size-5" />
-                <span className="min-w-0 flex-1 truncate font-mono">{a.fullName}</span>
-                <Badge variant="default">{a.count}</Badge>
-              </a>
-            ))}
+            {s.mostActive.map((a) => {
+              const content = <><Avatar src={a.repo?.ownerAvatarUrl} alt={a.fullName} className="size-5" /><span className="min-w-0 flex-1 truncate font-mono">{a.fullName}</span><Badge variant="default">{a.count}</Badge></>;
+              return a.repo ? <Link key={a.fullName} href={`/map?repo=${encodeURIComponent(a.fullName)}`} className="flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-accent">{content}</Link> : <a key={a.fullName} href={`https://github.com/${a.fullName}`} target="_blank" rel="noopener" className="flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-accent">{content}</a>;
+            })}
           </CardContent>
         </Card>
         {/* Recent activity */}
@@ -187,6 +200,92 @@ export default function OverviewPage() {
       </Card>
     </div>
   );
+}
+
+function FocusQueue({ failingRepos, openPrs, runs, runsReady }: { failingRepos: GithubRepo[]; openPrs: GithubPullRequest[]; runs: GithubWorkflowRun[]; runsReady: boolean }) {
+  const items: FocusItem[] = [];
+  failingRepos.slice(0, 2).forEach((repo) => {
+    items.push({
+      label: "Fix failing CI",
+      detail: repo.fullName,
+      href: `/map?repo=${encodeURIComponent(repo.fullName)}`,
+      tone: "danger",
+      icon: AlertTriangle,
+    });
+  });
+  openPrs
+    .filter((pr) => pr.reviewRequested || pr.reviewState === "review_required" || pr.reviewState === "changes_requested")
+    .slice(0, 2)
+    .forEach((pr) => {
+      items.push({
+        label: pr.reviewState === "changes_requested" ? "Resolve requested changes" : "Review requested",
+        detail: `#${pr.number} · ${pr.repoFullName}`,
+        href: pr.htmlUrl,
+        tone: "warning",
+        icon: GitPullRequest,
+        external: true,
+      });
+    });
+  if (runsReady) {
+    runs
+      .filter((run) => run.status === "in_progress" || run.status === "queued")
+      .slice(0, 2)
+      .forEach((run) => {
+        items.push({
+          label: run.status === "queued" ? "Watch queued workflow" : "Watch running workflow",
+          detail: `${run.repoFullName} · ${run.workflowName}`,
+          href: run.htmlUrl,
+          tone: "active",
+          icon: Play,
+          external: true,
+        });
+      });
+  }
+  if (items.length < 4) {
+    openPrs
+      .filter((pr) => (pr.state === "open" || pr.state === "draft") && ageInDays(pr.updatedAt) >= 14)
+      .sort((a, b) => ageInDays(b.updatedAt) - ageInDays(a.updatedAt))
+      .slice(0, 4 - items.length)
+      .forEach((pr) => {
+        items.push({
+          label: "Unblock a stale PR",
+          detail: `#${pr.number} · ${pr.repoFullName} · ${Math.floor(ageInDays(pr.updatedAt))}d quiet`,
+          href: pr.htmlUrl,
+          tone: "muted",
+          icon: GitPullRequest,
+          external: true,
+        });
+      });
+  }
+  const visible = items.slice(0, 4);
+
+  return (
+    <Card accent={18} className="overflow-hidden">
+      <CardContent className="flex flex-col gap-3 pt-3 lg:flex-row lg:items-center">
+        <div className="flex items-center gap-2 lg:w-52 lg:shrink-0">
+          <span className="grid size-8 place-items-center rounded-lg bg-[color-mix(in_srgb,var(--primary)_15%,transparent)] text-[var(--primary)]"><Zap className="size-4" /></span>
+          <span><span className="block text-xs font-semibold">Focus queue</span><span className="block text-[10px] text-muted-foreground">The next useful things to look at</span></span>
+        </div>
+        {visible.length ? (
+          <div className="grid min-w-0 flex-1 gap-1.5 sm:grid-cols-2 xl:grid-cols-4">
+            {visible.map((item) => <FocusItemRow key={`${item.label}-${item.detail}`} item={item} />)}
+          </div>
+        ) : (
+          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-[color-mix(in_srgb,var(--success)_35%,var(--border))] bg-[color-mix(in_srgb,var(--success)_6%,transparent)] px-3 py-2"><CheckCircle2 className="size-4 text-[var(--success)]" /><span className="text-xs text-[var(--success)]">No urgent signals. Your workspace is in a good place.</span></div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+type FocusItem = { label: string; detail: string; href: string; tone: "danger" | "warning" | "active" | "muted"; icon: typeof AlertTriangle; external?: boolean };
+
+function FocusItemRow({ item }: { item: FocusItem }) {
+  const Icon = item.icon;
+  const tone = item.tone === "danger" ? "text-[var(--destructive)]" : item.tone === "warning" ? "text-[var(--warning)]" : item.tone === "active" ? "text-[var(--primary)]" : "text-muted-foreground";
+  const content = <><span className={cn("grid size-6 shrink-0 place-items-center rounded bg-accent", tone)}><Icon className="size-3.5" /></span><span className="min-w-0 flex-1"><span className={cn("block truncate text-[10px] font-medium", tone)}>{item.label}</span><span className="block truncate font-mono text-[10px] text-muted-foreground">{item.detail}</span></span>{item.external ? <ArrowUpRight className="size-3 shrink-0 text-muted-foreground" /> : <ArrowRight className="size-3 shrink-0 text-muted-foreground" />}</>;
+  const className = "group flex min-w-0 items-center gap-2 rounded-md border border-border/70 bg-background/25 px-2 py-1.5 transition hover:border-primary/60 hover:bg-accent";
+  return item.external ? <a href={item.href} target="_blank" rel="noopener" className={className}>{content}</a> : <Link href={item.href} className={className}>{content}</Link>;
 }
 
 function OverviewLoading() {
